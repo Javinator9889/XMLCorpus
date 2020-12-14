@@ -27,7 +27,7 @@ from typing import Optional, Dict, List, Any, Union, TypeVar, Generic
 
 @dataclass
 class XMLItem(ABC):
-    tag: str
+    tag: Optional[str]
     item_tag: field(init=False, default=None)
 
     @staticmethod
@@ -215,7 +215,7 @@ class AnnotationStatus(Enum):
 
 
 @dataclass
-class Token:
+class Token(XMLItem):
     id: str
     form: str
     alignment_id: Optional[List[str]] = None
@@ -223,14 +223,99 @@ class Token:
     part_of_speech: Optional[Value] = None
     morphology: Optional[List[Morphology]] = None
     gloss: Optional[Value] = None
+    tag: str = field(default=None, init=False)
+    item_tag: str = field(default='token', init=False)
+
+    @staticmethod
+    def parse(element: etree._Element,
+              annotation: Annotation,
+              tag: str = 'token') -> "XMLItem":
+        XMLItem.check_tag(element, tag)
+        token = Token(id=element.get('id'), form=element.get('form'))
+        for attr, value in element.attrib.items():
+            attr_value = value
+            if attr == 'morphology':
+                fields = []
+                dirs = {}
+                idx = 0
+                for i, field in zip(range(len(value)), value):
+                    if field != '-':
+                        fields.insert(idx, annotation.morphology[i][field])
+                        dirs[annotation.morphology[i].tag] = idx
+                        idx += 1
+                attr_value = Morphology(tag=None, fields=fields, dirs=dirs)
+            elif attr == 'part-of-speech':
+                attr_value = annotation.parts_of_speech[value]
+            setattr(token, attr, attr_value)
+        return token
+
+    def describe(self) -> List[str]:
+        token_desc = [self.form, self.lemma or '']
+        if self.part_of_speech is not None:
+            token_desc.insert(2, self.part_of_speech.summary)
+        else:
+            token_desc.insert(2, '')
+        if self.morphology is not None and len(self.morphology) > 0:
+            desc_morph = []
+            for morph in self.morphology:
+                for field in morph.fields:
+                    for value in field.fields:
+                        desc_morph.append(value.summary)
+            token_desc.insert(3, ' '.join(desc_morph))
+        else:
+            token_desc.insert(3, '')
+        if self.gloss is not None:
+            token_desc.insert(4, self.gloss.summary)
+        else:
+            token_desc.insert(4, '')
+        return token_desc
+
+    def to_table(self, tabletype="simple", add_headers=True) -> str:
+        headers = ["Word\t\t|", "Lemma\t\t|", "Part of speech\t|",
+                   "Morphology\t|", "Gloss\t\t|"]
+        table_output = [[]] * len(headers)
+        if add_headers:
+            for i, header in zip(range(len(headers)), headers):
+                table_output.insert(i, [header])
+        token_desc = self.describe()
+        for i, desc in zip(range(len(token_desc)), token_desc):
+            table_output[i].append(desc)
+
+        align = ("center",) * len(table_output[0])
+        return tabulate(table_output, colalign=align, tablefmt="plain")
 
 
 @dataclass
-class Sentence:
-    id: str
+class Sentence(XMLGroup[Token]):
+    id: str = ""
+    cls = Token
     status: AnnotationStatus = field(default=AnnotationStatus.UNANNOTATED)
     alignment_id: Optional[str] = None
-    tokens: Dict[str, Token] = field(default_factory=dict)
+
+    @classmethod
+    def parse(cls,
+              element: etree._Element,
+              subcls: T,
+              tag: str = None) -> "XMLGroup":
+        sentence = super(Sentence, cls).parse(element, subcls, tag)
+        sentence.status = AnnotationStatus[element.get('status').upper()]
+        sentence.alignment_id = element.get('alignment-id')
+        sentence.id = element.get('id')
+
+        return sentence
+
+    def to_table(self, tabletype="simple") -> str:
+        table_output = [[f"{self.id} ({self.status.value})\t|"],
+                        ["Lemma\t\t|"],
+                        ["Part of speech\t|"],
+                        ["Morphology\t|"],
+                        ["Gloss\t\t|"]]
+        for token in self.fields:
+            desc = token.describe()
+            for i, data in zip(range(len(desc)), desc):
+                table_output[i].append(data)
+        align = ("center",) * len(table_output[0])
+        return tabulate(table_output, colalign=align, tablefmt="plain")
 
 
 @dataclass
