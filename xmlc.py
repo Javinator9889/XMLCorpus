@@ -15,8 +15,6 @@
 #    along with this program. If not, see <http://www.gnu.org/licenses/>.
 from enum import Enum
 from lxml import etree
-# from rich.console import Console
-# from rich import print
 from tabulate import tabulate
 from argparse import ArgumentParser
 from collections import OrderedDict
@@ -24,8 +22,7 @@ from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
 # type hints
-from typing import Optional, Dict, List, Any, Union, Tuple, OrderedDict as \
-    OD, TypeVar, Generic
+from typing import Optional, Dict, List, Any, Union, TypeVar, Generic
 
 
 @dataclass
@@ -46,7 +43,7 @@ class XMLItem(ABC):
     @staticmethod
     def check_tag(element: etree._Element, tag: str):
         if element.tag != tag:
-            raise ValueError(f"Element {element}'s tag must be '{tag}'")
+            raise ValueError(f"Element {element.tag}'s tag must be '{tag}'")
 
 
 T = TypeVar('T')
@@ -54,22 +51,33 @@ T = TypeVar('T')
 
 @dataclass
 class XMLGroup(XMLItem, Generic[T]):
+    cls: T
+    subitem_tag: str = field(default=None, init=False)
     fields: List[T] = field(default_factory=list)
     dirs: Dict[str, int] = field(default_factory=dict)
 
-    @staticmethod
-    def parse(element: etree._Element, tag: str = 'test') -> "XMLItem":
-        if not isinstance(T, XMLItem):
-            raise AttributeError(f"Class {T} must inherit from XMLItem")
+    @classmethod
+    def parse(cls,
+              element: etree._Element,
+              subcls: T,
+              tag: str = None) -> "XMLGroup":
+        if not issubclass(subcls, XMLItem) and not issubclass(subcls, XMLGroup):
+            raise AttributeError(f"Class {subcls} must inherit from XMLItem or "
+                                 f"XMLGroup")
         fields = list()
         dirs = dict()
         idx = 0
         for field in element:
-            value = T.parse(field, T.item_tag)
+            if issubclass(subcls, XMLGroup):
+                value = subcls.parse(field, subcls.cls,
+                                     tag or subcls.subitem_tag)
+            else:
+                value = subcls.parse(field, tag or subcls.item_tag)
             fields.insert(idx, value)
             dirs[value.tag] = idx
             idx += 1
-        return XMLGroup(element.get('tag'), element.tag, fields, dirs)
+
+        return cls(element.get('tag'), element.tag, fields, dirs)
 
     @abstractmethod
     def to_table(self, tabletype="simple") -> str:
@@ -95,23 +103,9 @@ class Value(XMLItem):
 
 @dataclass
 class Field(XMLGroup[Value]):
-    # tag: str
-    # item_tag: str = field(default='field', init=False)
-    # values: List[Value] = field(default_factory=list)
-    # _dirs: Dict[str, int] = field(default_factory=list)
-    #
-    # @staticmethod
-    # def parse(element: etree._Element, tag: str = 'field') -> "Field":
-    #     XMLItem.check_tag(element, tag)
-    #     values = list()
-    #     dirs = dict()
-    #     idx = 0
-    #     for value in element:
-    #         val = Value.parse(value)
-    #         values.insert(idx, val)
-    #         dirs[val.tag] = idx
-    #         idx += 1
-    #     return Field(element.get('tag'), values, dirs)
+    cls: T = Value
+    item_tag: str = field(default='field', init=False)
+    subitem_tag: str = field(default='value', init=False)
 
     def to_table(self, tabletype="simple") -> str:
         table_contents = []
@@ -136,106 +130,82 @@ class Field(XMLGroup[Value]):
 
 @dataclass
 class Morphology(XMLGroup[Field]):
-    # fields: List[Field] = field(default_factory=list)
-    # _dirs: Dict[str, int] = field(default_factory=dict)
-    # fields: OD[str, Field] = field(default_factory=OrderedDict)
+    cls: T = Field
+    item_tag: str = field(default='morphology', init=False)
+    subitem_tag: str = field(default='field', init=False)
 
-    def get(self, item: str, default_value: Any = None):
+    def to_table(self, ignored="simple") -> str:
+        return str(self)
+
+    def get(self, item: Union[str, int], default_value: Any = None) -> \
+            Union[Field, Any]:
         try:
-            return self[item]
+            return self.fields[item] if isinstance(item, int) \
+                else self.fields[self.dirs[item]]
         except KeyError:
             return default_value
-
-    def get_recursive(self, item: str, default_value: Any = None) -> \
-            Union[Any, Tuple[str, Value]]:
-        try:
-            return self[item]
-        except KeyError:
-            for _, field in self.fields.items():
-                for _, value in field.values.items():
-                    if value.tag == item or value.summary == item:
-                        return field.tag, value
-            return default_value
-    # @staticmethod
-    # def parse(element: etree._Element, tag: str = 'morphology') -> "Morphology":
-    #     XMLItem.check_tag(element, tag)
-    #     fields = list()
-    #     dirs = dict()
-    #     idx = 0
-    #     for field in element:
-    #         pass
 
     def __getitem__(self, item: Union[str, int]):
-        return self.fields[item] if isinstance(item, str) \
-            else self.fields[list(self.fields.items())[item][0]]
+        return self.get(item)
 
     def __str__(self):
         res = ['Morphology']
-        for _, value in self.fields.items():
+        for value in self.fields:
             res.append(str(value))
         return '\n'.join(res)
 
 
 @dataclass
-class Annotation:
+class Annotation(XMLItem):
     morphology: Morphology
-    parts_of_speech: Dict[str, Value] = field(default_factory=dict)
-    gloss: Dict[str, Value] = field(default_factory=dict)
+    parts_of_speech: Optional[Field] = field(default=None)
+    gloss: Optional[Field] = field(default=None)
 
     def __str__(self):
+        return self.to_table(tabletype="fancy_grid")
+
+    @staticmethod
+    def parse(annotation: etree._Element,
+              tag: str = 'annotation') -> "Annotation":
+        XMLItem.check_tag(annotation, tag)
+        morphology = Morphology.parse(element=annotation.find('morphology'),
+                                      subcls=Morphology.cls)
+
+        pos = annotation.find('parts-of-speech')
+        if pos is not None:
+            parts_of_speech = Field.parse(pos, subcls=Value)
+
+        gls = annotation.find('gloss')
+        if gls is not None:
+            gloss = Field.parse(gls, subcls=Value)
+
+        return Annotation(annotation.get('tag'),
+                          annotation.tag,
+                          morphology,
+                          parts_of_speech,
+                          gloss)
+
+    def to_table(self, tabletype="simple") -> str:
         res = [str(self.morphology)]
-        if len(self.parts_of_speech) > 0:
+        if self.parts_of_speech is not None:
             res.append('Parts of speech')
             pos = []
-            for _, value in self.parts_of_speech.items():
+            for value in self.parts_of_speech.fields:
                 pos.append((value.tag, value.summary))
             res.append(tabulate(pos,
                                 headers=('Tag', 'Summary'),
-                                tablefmt="fancy_grid",
+                                tablefmt=tabletype,
                                 colalign=("center", "center")))
-        if len(self.gloss) > 0:
+        if self.gloss is not None:
             res.append('Gloss')
             gls = []
-            for _, value in self.gloss.items():
+            for value in self.gloss.fields:
                 gls.append((value.tag, value.summary))
             res.append(tabulate(gls,
                                 headers=('Tag', 'Summary'),
-                                tablefmt="fancy_grid",
+                                tablefmt=tabletype,
                                 colalign=("center", "center")))
         return '\n'.join(res)
-
-    @staticmethod
-    def parse(annotation: etree.Element) -> "Annotation":
-        morph = OrderedDict()
-        mph = annotation.find('morphology')
-        if mph is None:
-            raise ValueError('Morphology attribute is mandatory!')
-        for morphology in mph.findall('field'):
-            tag = morphology.get('tag')
-            values = {}
-            for value in morphology.findall('value'):
-                vtag = value.get('tag')
-                vsummary = value.get('summary')
-                values[vtag] = Value(vtag, vsummary)
-            morph[tag] = Field(tag, values)
-
-        parts_of_speech = dict()
-        pos = annotation.find('parts-of-speech')
-        if pos is not None:
-            for value in pos.findall('value'):
-                tag = value.get('tag')
-                summary = value.get('summary')
-                parts_of_speech[tag] = Value(tag, summary)
-
-        gloss = dict()
-        gls = annotation.find('gloss')
-        if gls is not None:
-            for gloss_value in gls.findall('value'):
-                tag = gloss_value.get('tag')
-                summary = gloss_value.get('summary')
-                gloss[tag] = Value(tag, summary)
-
-        return Annotation(Morphology(morph), parts_of_speech, gloss)
 
 
 class AnnotationStatus(Enum):
@@ -343,7 +313,8 @@ class Source:
 
 
 def main(args):
-    tree = etree.parse(args.file)
+    parser = etree.XMLParser(remove_comments=True)
+    tree = etree.parse(args.file, parser=parser)
     annotation_element = None
     if args.annotation_file is not None:
         annotation_tree = etree.parse(args.annotation_file)
