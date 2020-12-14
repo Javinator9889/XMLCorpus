@@ -15,9 +15,9 @@
 #    along with this program. If not, see <http://www.gnu.org/licenses/>.
 from enum import Enum
 from lxml import etree
+from warnings import warn
 from tabulate import tabulate
 from argparse import ArgumentParser
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
@@ -32,7 +32,9 @@ class XMLItem(ABC):
 
     @staticmethod
     @abstractmethod
-    def parse(element: etree._Element, tag: str) -> "XMLItem":
+    def parse(element: etree._Element,
+              tag: str,
+              **kwargs) -> "Optional[XMLItem]":
         """Parses the element into the selected tag. This method must be
         implemented by all subclasses"""
 
@@ -60,7 +62,8 @@ class XMLGroup(XMLItem, Generic[T]):
     def parse(cls,
               element: etree._Element,
               subcls: T,
-              tag: str = None) -> "XMLGroup":
+              tag: str = None,
+              **kwargs) -> "Optional[XMLGroup]":
         if not issubclass(subcls, XMLItem) and not issubclass(subcls, XMLGroup):
             raise AttributeError(f"Class {subcls} must inherit from XMLItem or "
                                  f"XMLGroup")
@@ -69,13 +72,18 @@ class XMLGroup(XMLItem, Generic[T]):
         idx = 0
         for field in element:
             if issubclass(subcls, XMLGroup):
-                value = subcls.parse(field, subcls.cls,
-                                     tag or subcls.subitem_tag)
+                value = subcls.parse(element=field,
+                                     subcls=subcls.cls,
+                                     tag=tag or subcls.subitem_tag,
+                                     **kwargs)
             else:
-                value = subcls.parse(field, tag or subcls.item_tag)
-            fields.insert(idx, value)
-            dirs[value.tag] = idx
-            idx += 1
+                value = subcls.parse(element=field,
+                                     tag=tag or subcls.item_tag,
+                                     **kwargs)
+            if value is not None:
+                fields.insert(idx, value)
+                dirs[value.tag] = idx
+                idx += 1
 
         return cls(element.get('tag'), element.tag, fields, dirs)
 
@@ -91,7 +99,7 @@ class Value(XMLItem):
     item_tag: str = field(default="value", init=False)
 
     @staticmethod
-    def parse(element: etree._Element, tag: str = 'value') -> "Value":
+    def parse(element: etree._Element, tag: str = 'value', **kwargs) -> "Value":
         XMLItem.check_tag(element, tag)
         return Value(element.get('tag'), element.get('summary'))
 
@@ -166,18 +174,18 @@ class Annotation(XMLItem):
 
     @staticmethod
     def parse(annotation: etree._Element,
-              tag: str = 'annotation') -> "Annotation":
+              tag: str = 'annotation', **kwargs) -> "Annotation":
         XMLItem.check_tag(annotation, tag)
         morphology = Morphology.parse(element=annotation.find('morphology'),
                                       subcls=Morphology.cls)
 
         pos = annotation.find('parts-of-speech')
         if pos is not None:
-            parts_of_speech = Field.parse(pos, subcls=Value)
+            parts_of_speech = Field.parse(pos, subcls=Value, **kwargs)
 
         gls = annotation.find('gloss')
         if gls is not None:
-            gloss = Field.parse(gls, subcls=Value)
+            gloss = Field.parse(gls, subcls=Value, **kwargs)
 
         return Annotation(annotation.get('tag'),
                           annotation.tag,
@@ -221,17 +229,18 @@ class Token(XMLItem):
     alignment_id: Optional[List[str]] = None
     lemma: Optional[str] = None
     part_of_speech: Optional[Value] = None
-    morphology: Optional[List[Morphology]] = None
+    morphology: Optional[Morphology] = None
     gloss: Optional[Value] = None
     tag: str = field(default=None, init=False)
     item_tag: str = field(default='token', init=False)
 
     @staticmethod
     def parse(element: etree._Element,
-              annotation: Annotation,
-              tag: str = 'token') -> "XMLItem":
+              tag: str = 'token',
+              **kwargs) -> "XMLItem":
         XMLItem.check_tag(element, tag)
         token = Token(id=element.get('id'), form=element.get('form'))
+        annotation: Annotation = kwargs['annotation']
         for attr, value in element.attrib.items():
             attr_value = value
             if attr == 'morphology':
@@ -240,12 +249,24 @@ class Token(XMLItem):
                 idx = 0
                 for i, field in zip(range(len(value)), value):
                     if field != '-':
-                        fields.insert(idx, annotation.morphology[i][field])
-                        dirs[annotation.morphology[i].tag] = idx
-                        idx += 1
+                        try:
+                            fields.insert(idx, annotation.morphology[i][field])
+                            dirs[annotation.morphology[i].tag] = idx
+                            idx += 1
+                        except KeyError:
+                            if i > len(annotation.morphology.fields):
+                                warn(f"More morphologies {i} than previously"
+                                     f"declared (were "
+                                     f"{len(annotation.morphology.fields)})")
+                            else:
+                                warn(f"Non-identified morphology item "
+                                     f"'{field}' at position "
+                                     f"'{annotation.morphology[i].tag}'")
                 attr_value = Morphology(tag=None, fields=fields, dirs=dirs)
             elif attr == 'part-of-speech':
                 attr_value = annotation.parts_of_speech[value]
+            elif attr == 'gloss':
+                attr_value = annotation.gloss[value]
             setattr(token, attr, attr_value)
         return token
 
@@ -255,12 +276,10 @@ class Token(XMLItem):
             token_desc.insert(2, self.part_of_speech.summary)
         else:
             token_desc.insert(2, '')
-        if self.morphology is not None and len(self.morphology) > 0:
+        if self.morphology is not None:
             desc_morph = []
-            for morph in self.morphology:
-                for field in morph.fields:
-                    for value in field.fields:
-                        desc_morph.append(value.summary)
+            for value in self.morphology.fields:
+                desc_morph.append(value.summary)
             token_desc.insert(3, ' '.join(desc_morph))
         else:
             token_desc.insert(3, '')
@@ -289,6 +308,8 @@ class Token(XMLItem):
 class Sentence(XMLGroup[Token]):
     id: str = ""
     cls = Token
+    item_tag: str = field(default='sentence', init=False)
+    subitem_tag: str = field(default='token', init=False)
     status: AnnotationStatus = field(default=AnnotationStatus.UNANNOTATED)
     alignment_id: Optional[str] = None
 
@@ -296,105 +317,87 @@ class Sentence(XMLGroup[Token]):
     def parse(cls,
               element: etree._Element,
               subcls: T,
-              tag: str = None) -> "XMLGroup":
-        sentence = super(Sentence, cls).parse(element, subcls, tag)
+              tag: str = None,
+              **kwargs) -> "Optional[XMLGroup]":
+        if element.tag == 'title':
+            return None
+        sentence = super(Sentence, cls).parse(element,
+                                              subcls,
+                                              tag,
+                                              **kwargs)
+        sentence.id = element.get('id')
         sentence.status = AnnotationStatus[element.get('status').upper()]
         sentence.alignment_id = element.get('alignment-id')
-        sentence.id = element.get('id')
 
         return sentence
 
-    def to_table(self, tabletype="simple") -> str:
+    def to_table(self, tabletype="plain") -> str:
         table_output = [[f"{self.id} ({self.status.value})\t|"],
                         ["Lemma\t\t|"],
                         ["Part of speech\t|"],
                         ["Morphology\t|"],
                         ["Gloss\t\t|"]]
         for token in self.fields:
+            if token is None:
+                continue
             desc = token.describe()
             for i, data in zip(range(len(desc)), desc):
                 table_output[i].append(data)
         align = ("center",) * len(table_output[0])
-        return tabulate(table_output, colalign=align, tablefmt="plain")
+        return tabulate(table_output, colalign=align, tablefmt=tabletype)
 
 
 @dataclass
-class Source:
-    id: str
-    language: str
-    title: str
-    citation_part: str
+class Source(XMLGroup[Sentence]):
+    id: str = ''
+    language: str = ''
+    title: str = ''
+    citation_part: str = ''
+    item_tag: str = field(default='source', init=False)
+    cls: T = Sentence
+    subitem_tag: str = field(default='sentence', init=False)
     alignment_id: Optional[str] = None
     editorial_note: Optional[str] = None
     annotator: Optional[str] = None
     reviewer: Optional[str] = None
     original_url: Optional[str] = None
-    sentences: Dict[str, Sentence] = field(default_factory=dict)
 
-    @staticmethod
-    def parse(source: etree.Element, annotations: Annotation) -> "Source":
-        sid = source.get('id')
-        language = source.get('language')
-        alignment_id = source.get('alignment-id')
-        title = source.find('title').text
-        citation_part = source.find('citation-part').text
-        editorial_note = source.find('editorial-note').text
-        annotator = source.find('annotator').text
-        reviewer = source.find('reviewer').text
-        original_url = source.find('electronic-text-original-url').text
+    @classmethod
+    def parse(cls,
+              element: etree._Element,
+              subcls: T,
+              tag: str = None,
+              **kwargs) -> "XMLGroup":
+        id = element.get('id')
+        language = element.get('language')
+        alignment_id = element.get('alignment-id')
+        title = element.find('title').text
+        citation_part = element.find('citation-part').text
+        editorial_note = element.find('editorial-note').text
+        annotator = element.find('annotator').text
+        reviewer = element.find('reviewer').text
+        original_url = element.find('electronic-text-original-url').text
+        source = super(Source, cls).parse(element.find('div'),
+                                          subcls,
+                                          tag,
+                                          **kwargs)
+        source.id = id
+        source.language = language
+        source.alignment_id = alignment_id
+        source.title = title
+        source.citation_part = citation_part
+        source.editorial_note = editorial_note
+        source.annotator = annotator
+        source.reviewer = reviewer
+        source.original_url = original_url
 
-        sentences = dict()
-        for sentence in source.find('div').findall('sentence'):
-            sentence_id = sentence.get('id')
-            sentence_aid = sentence.get('alignment-id')
-            sentence_status = AnnotationStatus[sentence.get('status').upper()]
-            tokens = dict()
-            for token in sentence.findall('token'):
-                tkid = token.get('id')
-                form = token.get('form')
-                tk_alignment_id = token.get('alignment-id').split(',') \
-                    if token.get('alignment-id') is not None else None
+        return source
 
-                lemma = token.get('lemma')
-                part_of_speech = annotations \
-                    .parts_of_speech[token.get('part-of-speech')] \
-                    if token.get('part-of-speech') is not None else None
-
-                morphology = None
-                mph = token.get('morphology')
-                if mph is not None:
-                    morphology = dict()
-                    for i, morph in zip(range(len(mph)), mph):
-                        current_morph = annotations.morphology[i]
-                        found_morph = current_morph.values.get(morph, None)
-                        if found_morph is not None:
-                            morphology[found_morph.tag] = Morphology(
-                                OrderedDict({
-                                    current_morph.tag: Field(
-                                        current_morph.tag, {
-                                            found_morph.tag: found_morph
-                                        })
-                                })
-                            )
-
-                gloss = annotations.gloss[token.get('gloss')] \
-                    if token.get('gloss') is not None else None
-
-                tokens[tkid] = Token(tkid, form, tk_alignment_id, lemma,
-                                     part_of_speech, morphology, gloss)
-
-            sentences[sentence_id] = Sentence(sentence_id, sentence_status,
-                                              sentence_aid, tokens)
-        return Source(id=sid,
-                      language=language,
-                      alignment_id=alignment_id,
-                      title=title,
-                      citation_part=citation_part,
-                      editorial_note=editorial_note,
-                      annotator=annotator,
-                      reviewer=reviewer,
-                      original_url=original_url,
-                      sentences=sentences)
+    def to_table(self, tabletype="simple") -> str:
+        sentences = []
+        for sentence in self.fields:
+            sentences.append(sentence.to_table(tabletype))
+        return '\n\n'.join(sentences)
 
 
 def main(args):
@@ -410,72 +413,13 @@ def main(args):
     annotation = Annotation.parse(annotation_element)
     print(annotation)
 
-    sources = dict()
+    sources = {}
     for source in tree.findall('source'):
-        found_source = Source.parse(source, annotation)
-        sources[found_source.id] = found_source
+        src = Source.parse(source, Sentence, annotation=annotation)
+        sources[src.id] = src
 
-    for key, value in sources.items():
-        table_output = []
-        for _, sentence in value.sentences.items():
-            sentence_line = [f"{sentence.id} ({sentence.status.value})\t|"]
-            lemma_line = ["Lemma\t\t|"]
-            pos_line = ["Part of speech\t|"]
-            morph_line = ["Morphology\t|"]
-            gloss_line = ["Gloss\t\t|"]
-            for _, token in sentence.tokens.items():
-                sentence_line.append(token.form)
-                lemma_line.append(token.lemma or '')
-                # lemma = f"{token.lemma}[/red]" \
-                #     if token.lemma is not None else ''
-                #
-                # lemma_line.append(lemma)
-                if token.part_of_speech is not None:
-                    pos_line.append(token.part_of_speech.summary)
-                else:
-                    pos_line.append('')
-                if token.morphology is not None and len(token.morphology) > 0:
-                    desc_morph = []
-                    # print(token.morphology)
-                    for morph in token.morphology:
-                        # print(morph)
-                        # print(token.morphology[morph].fields)
-                        for field in token.morphology[morph].fields:
-                            # print(list(token.morphology[morph][
-                            #              field].values.items())[0][1].summary)
-                            desc_morph.append(
-                                list(token.morphology[morph][
-                                         field].values.items())[0][1].summary)
-                        # desc_morph.append(token.morphology[morph].fields)
-                    morph_line.append(' '.join(desc_morph))
-                else:
-                    morph_line.append('')
-                if token.gloss is not None:
-                    gloss_line.append(token.gloss.summary)
-                else:
-                    gloss_line.append('')
-
-            table_output.append(sentence_line)
-            table_output.append(lemma_line)
-            table_output.append(pos_line)
-            table_output.append(morph_line)
-            table_output.append(gloss_line)
-            break
-        align = ("center",) * len(table_output[0])
-        print(tabulate(table_output, colalign=align, tablefmt="plain"),
-              end='\n\n')
-
-        # console = Console()
-        # console.print(tabulate(table_output, colalign=align,
-        # tablefmt="plain"))
-
-        # complete_sentence = []
-        # for _, sentence in value.sentences.items():
-        #     for _, token in sentence.tokens.items():
-        #         complete_sentence.append(token.form)
-        # print(' '.join(complete_sentence))
-
-    # print(sources['text1'].sentences['0a'].tokens['2a'].morphology)
+    for _, source in sources.items():
+        print(source.to_table(tabletype="latex_booktabs"))
 
 
 if __name__ == '__main__':
