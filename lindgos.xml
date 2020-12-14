@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<proiel export-time="2016-06-20T14:37:08+02:00" schema-version="2.1"> <!--Change the export-time of this file-->
+  <annotation>
+    <parts-of-speech>
+      <value tag="A-" summary="adjective"/>
+      <value tag="S-" summary="article"/>
+      <value tag="Ma" summary="cardinal numeral"/>
+      <value tag="Nb" summary="common noun"/>
+      <value tag="C-" summary="conjunction"/>
+      <value tag="Pd" summary="demonstrative pronoun"/> <!--It is not clear when it is demonstrative or when determiner so all on the same category-->
+      <value tag="Px" summary="indefinite pronoun"/>
+      <value tag="Pi" summary="interrogative pronoun"/>
+      <value tag="Mo" summary="ordinal numeral"/>
+      <value tag="Pp" summary="personal pronoun"/>
+      <value tag="Pk" summary="personal reflexive pronoun"/>
+      <value tag="Ps" summary="possessive pronoun"/>
+      <value tag="Pt" summary="possessive reflexive pronoun"/>
+      <value tag="R-" summary="preposition"/>
+      <value tag="Ne" summary="proper noun"/>
+      <value tag="Py" summary="quantifier"/>
+      <value tag="G-" summary="subjunction"/>
+      <value tag="Pc" summary="reciprocal pronoun"/>
+      <value tag="Pr" summary="relative pronoun"/>
+      <value tag="X-" summary="unassigned"/>
+    </parts-of-speech>
+    <morphology>
+      <field tag="person">
+        <value tag="1" summary="first person"/>
+        <value tag="2" summary="second person"/>
+        <value tag="3" summary="third person"/>
+        <value tag="x" summary="uncertain person"/>
+      </field>
+      <field tag="number">
+        <value tag="s" summary="singular"/>
+        <value tag="d" summary="dual"/>
+        <value tag="p" summary="plural"/>
+        <value tag="x" summary="uncertain number"/>
+      </field>
+
+      <field tag="gender">
+        <value tag="m" summary="masculine"/>
+        <value tag="f" summary="feminine"/>
+        <value tag="n" summary="neuter"/>
+        <value tag="p" summary="masculine or feminine"/>
+        <value tag="o" summary="masculine or neuter"/>
+        <value tag="r" summary="feminine or neuter"/>
+        <value tag="q" summary="masculine, feminine or neuter"/>
+        <value tag="x" summary="uncertain gender"/>
+      </field>
+      <field tag="case">
+        <value tag="n" summary="nominative"/>
+        <value tag="a" summary="accusative"/>
+        <value tag="o" summary="oblique"/>
+        <value tag="g" summary="genitive"/>
+        <value tag="c" summary="genitive or dative"/>
+        <value tag="e" summary="accusative or dative"/>
+        <value tag="d" summary="dative"/>
+        <value tag="b" summary="ablative"/>
+        <value tag="i" summary="instrumental"/>
+        <value tag="l" summary="locative"/>
+        <value tag="v" summary="vocative"/>
+        <value tag="x" summary="uncertain case"/>
+        <value tag="z" summary="no case"/>
+      </field>
+      <field tag="degree">
+        <value tag="p" summary="positive"/>
+        <value tag="c" summary="comparative"/>
+        <value tag="s" summary="superlative"/>
+        <value tag="x" summary="uncertain degree"/>
+        <value tag="z" summary="no degree"/>
+      </field>
+      <field tag="strength">
+        <value tag="w" summary="weak"/>
+        <value tag="s" summary="strong"/>
+        <value tag="t" summary="weak or strong"/>
+      </field>
+      <field tag="inflection">
+        <value tag="n" summary="non-inflecting"/>
+        <value tag="i" summary="inflecting"/>
+      </field>
+      <field tag="agreement">
+        <value tag="s" summary="semantic"/>
+        <value tag="g" summary="grammatical"/>
+        <value tag="b" summary="semantic and grammatical"/>
+      </field>
+    </morphology>
+    <gloss> <!--This indicates wheather the word was translated from Latin, added or there are multiple translations-->
+      <value tag="l" summary="literal"/>
+      <value tag="a" summary="added"/>
+      <value tag="v" summary="vel"/>
+    </gloss>
+  </annotation>
+
+  <!-- =========================================================
+                 HERE BEGINS TEXT I (LATIN)
+      ==========================================================-->
+
+  <source id="text1" alignment-id="text2" language="lat">
+    <title>Lindisfarne Gospels Latin</title>
+    <citation-part>text1</citation-part>
+    <editorial-note> Text is based on Joseph Stevenson and George Waring's (1863) The Lindisfarne and Rushworth Gospels edition.</editorial-note>
+    <annotator>Raquel Montero (nº sentences)</annotator>
+    <reviewer>name of reviewer (nº sentences)</reviewer>
+    <electronic-text-original-url>https://archive.org/details/lindisfarneandr00warigoog/page/n14/mode/2up</electronic-text-original-url>
+    <div>
+      <title> name </title>
+      <sentence id="0a" alignment-id="0b" status="annotated"> <!--status can be unannotated, annotated and reviewed-->
+        <token id="1a" form="incipit" />
+        <token id="2a" alignment-id="2b" form="evangelium" lemma="evangelium" part-of-speech="Nb" morphology="-snn----" />
+        <token id="3a" form="secundum" />
+        <token id="4a" alignment-id="4b" form="Lucam"  lemma="Lucas" part-of-speech="Ne" morphology="-sma----" />
+      </sentence>
+      <!--Sentences correspond to the numbering in the text by Skeats not to sentences in the lingustic sense-->
+
+      <sentence id="1a" alignment-id="1b" status="annotated">
+        <token id="5a" form="quoniam" />
+        <token id="6a" form="quidem" />
+        <token id="7a" alignment-id="7b" form="multi" lemma="multus" part-of-speech="Px" morphology= "-pmn--i-"/>
+        <token id="8a" form="conati" />
+        <token id="9a" form="sunt" />
+        <token id="10a" form="ordinare" />
+        <token id="11a" alignment-id="13b,14b" form="narrationem" lemma= "narratio" part-of-speech= "Nb" morphology= "-sfa--i-" />
+        <token id="12a" alignment-id="15b,16b" form="quæ" lemma="qui" part-of-speech="Pr" morphology= "-pfn--ig" />
+        <token id="13a" form="in" />
+        <token id="14a" alignment-id="18b" form="nobis" lemma= "nos" part-of-speech="Pp" morphology="-ppd--i-" />
+        <token id="15a" form="completæ" />
+        <token id="16a" form="sunt" />
+        <token id="17a" alignment-id="21b" form="rerum" lemma="res" part-of-speech="Nb" morphology="-pfg--i-" />
+      </sentence>
+
+      <sentence id="2a" alignment-id="2b" status="annotated">
+        <token id="18a" form="sicut" />
+        <token id="19a" form="tradiderunt" />
+        <token id="20a" alignment-id="24b" form="nobis" lemma="nos" part-of-speech="Pp" morphology="1ppd--i-" />
+        <token id="21a" alignment-id="25b,26b" form="qui" lemma="quis" part-of-speech="G-" morphology="-pmn--i-" />
+        <token id="22a" form="ab" />
+        <token id="23a" alignment-id="28b" form="initio" lemma="initium" part-of-speech="Nb" morphology="-smb--i-" />
+        <token id="24a" alignment-id="29b" form="ipsi" lemma="ipse" part-of-speech="Pp" morphology="3pmn--i-" />
+        <token id="25a" form="uiderunt" /> <!--Ask George, is a verb but functions as a noun?-->
+        <token id="26a" form="et" />
+        <token id="27a" alignment-id="32b" form="ministri" lemma="minister" part-of-speech="Nb" morphology="-pmn--i-"/>
+        <token id="28a" form="fuerunt" />
+        <token id="29a" alignment-id="34b" form="sermonis" lemma="sermo" part-of-speech="Nb" morphology="-smg--i-"  />
+      </sentence>
+
+      <sentence id="3a" alignment-id="3b" status="annotated">
+        <token id="30a" form="uisum" />
+        <token id="31a" form="est" />
+        <token id="32a" form="et" />
+        <token id="33a" alignment-id="38b" form="mihi" lemma="ego" part-of-speech="Pp" morphology="1smd--i-"  />
+        <token id="34a" form="assecuto"  />
+        <token id="35a" form="a" />
+        <token id="36a" alignment-id="41b" form="principio" lemma="principium" part-of-speech="Nb" morphology="-snb--i-" />
+        <token id="37a" alignment-id="42b" form="omnia" lemma="omnis" part-of-speech="Px" morphology="-pna--i-" /> <!--Ask George, nominalised adjectives? res=fem -->
+        <token id="38a" form="deligenter" />
+        <token id="39a" form="ex" />
+        <token id="40a" alignment-id="45b" form="ordine" lemma="ordo" part-of-speech="Nb" morphology="-smb--i-" />
+        <token id="41a" alignment-id="46b" form="tibi" lemma="tu" part-of-speech="Pp" morphology="-smd--i-" />
+        <token id="42a" form="scribere" />
+        <token id="43a" alignment-id="48b,49b" form="optime" lemma="bonus" part-of-speech="A-" morphology="-smvs-ib" />
+        <token id="44a" alignment-id="50b" form="theophile" lemma="theophilus" part-of-speech="Ne" morphology="-smv--i-" />
+      </sentence>
+
+      <sentence id="4a" alignment-id="4b" status="annotated">
+        <token id="45a" form="ut" />
+        <token id="46a" form="cognoscas" />
+        <token id="47a" alignment-id="54b" form="eorum" lemma="is" part-of-speech="Ps" morphology="3pog--i-" />
+        <token id="48a" alignment-id="55b" form="uerborum" lemma="verbum" part-of-speech="Nb" morphology="-png--i-" />
+        <token id="49a" form="de" />
+        <token id="50a" alignment-id="57b" form="quibus" lemma="qui" part-of-speech="Pr" morphology="-pnb--i-" />
+        <token id="51a" form="eruditus" />
+        <token id="52a" form="es" />
+        <token id="53a" alignment-id="60b,61b" form="ueritatem" lemma="veritas" part-of-speech="Nb" morphology="-sfa--i-" />
+      </sentence>
+      <sentence id="5a" alignment-id="5b" status="annotated">
+        <token id="54a" form="fuit" />
+        <token id="55a" form="in" />
+        <token id="56a" alignment-id="64b" form="diebus" lemma="dies" part-of-speech="Nb" morphology="-ppb--i-" />
+        <token id="57a" alignment-id="65b" form="herodis" lemma="herodes" part-of-speech="Ne" morphology="-smg--i-" />
+        <token id="58a" alignment-id="66b" form="regis" lemma="rex" part-of-speech="Nb" morphology="-smg--i-"  />
+        <token id="59a" alignment-id="67b" form="iudaeae" lemma="Judaea" part-of-speech="Ne" morphology="-sfg--i-" />
+        <token id="60a" alignment-id="68b" form="sacerdos" lemma="sacerdos" part-of-speech="Nb" morphology="-spn--i-" />
+        <token id="61a" alignment-id="69b" form="quidam" lemma="quidam" part-of-speech="Px" morphology="-smn--i-" />
+        <token id="62a" alignment-id="70b,71b" form="nomine" lemma="nomen" part-of-speech="Nb" morphology="-snb--i-" />
+        <token id="63a" form="zacharias" lemma="zacharias" part-of-speech="Ne" morphology="-smn--i-" />
+        <token id="64a" form="de" />
+        <token id="65a" alignment-id="73b" form="uice" lemma="vicis" part-of-speech="Nb" morphology="-sfb--i-" />
+        <token id="66a" alignment-id="74b" form="abia" lemma="abia" part-of-speech="Ne" morphology="-smx--i-" /> <!--indeclinable noun-->
+        <token id="67a" form="et" />
+        <token id="68a" alignment-id="76b" form="uxor" lemma="uxor" part-of-speech="Nb" morphology="-sfn--i-" />
+        <token id="69a" alignment-id="77b,78b" form="illi" lemma="ille" part-of-speech="Pd" morphology="3smd--i-" /> <!--?? not sure about the case-->
+        <token id="70a" form="de" />
+        <token id="71a" alignment-id="80b" form="filiabus" lemma="filia" part-of-speech="Nb" morphology="-pfb--i-" />
+        <token id="72a" alignment-id="81b" form="aron" lemma="aron" part-of-speech="Ne" morphology="-smx--i-" /> <!--indeclinable noun-->
+        <token id="73a" form="et" />
+        <token id="74a" alignment-id="83b" form="nomen" lemma="nomen" part-of-speech="Nb" morphology="-snn--i-" />
+        <token id="75a" alignment-id="84b" form="eius" lemma="is" part-of-speech="Ps" morphology="3sxg--i-" />
+        <token id="76a" alignment-id="85b" form="elisabet" lemma="elisabet" part-of-speech="Ne" morphology="-sfn--i-" />
+      </sentence>
+
+    </div>
+  </source>
+
+  <!-- =========================================================
+                 HERE BEGINS TEXT II (OE)
+      ==========================================================-->
+
+  <source id="text2" language="ang">
+    <title>Lindisfarne Gospels OE</title>
+    <citation-part>text2</citation-part>
+    <editorial-note> Text is based on Joseph Stevenson and George Waring's (1863) The Lindisfarne and Rushworth Gospels edition.</editorial-note>
+    <annotator>Raquel Montero (nº sentences)</annotator>
+    <reviewer>name of reviewer (nº sentences)</reviewer>
+    <electronic-text-original-url>https://archive.org/details/lindisfarneandr00warigoog/page/n14/mode/2up</electronic-text-original-url>
+    <div>
+      <title> name </title>
+      <sentence id="0b" status="annotated"> <!--status can be unannotated, annotated and reviewed-->
+        <token id="1b" form="onginneð"/>
+        <token id="2b" form="godspell" lemma="godspell" part-of-speech="Nb" morphology="-snn----" gloss="l" />
+        <token id="3b" form="æft" />
+        <token id="4b" form="Lucas" lemma="Lucas" part-of-speech="Ne" morphology="-sma----" gloss="l" />
+      </sentence>
+      <sentence id="1b" status="annotated">
+        <token id="5b" form="forðon"/>
+        <token id="6b" form="æcsoð"/>
+        <token id="7b" form="monigo" lemma="manig" part-of-speech="Px" morphology="-pmn--i-" gloss="l" /> <!--?? lemma-->
+        <token id="8b" form="cunnendo"/>
+        <token id="9b" form="woeron"/>
+        <token id="10b" form="þætte"/>
+        <token id="11b" form="hia"/><!--annotate this pronoun-->
+        <token id="12b" form="geendebrednadon "/>
+        <token id="13b" form="ðæt" lemma="se" part-of-speech="Pd" morphology="-sna--is" gloss="a" />
+        <token id="14b" form="gesaga" lemma="gesaga" part-of-speech="Nb" morphology="-smx--u-" gloss="l" />
+        <token id="15b" form="ða" lemma= "ða" part-of-speech="Pd" morphology="-pxn--ib" gloss="l" />
+        <token id="16b" form="ðe" lemma= "se" part-of-speech="Pd" morphology="-smn--i-" gloss="l"/>
+        <token id="17b" form="in"/>
+        <token id="18b" form="usic"/> <!--annotate this pronoun-->
+        <token id="19b" form="gefylled"/>
+        <token id="20b" form="aron"/>
+        <token id="21b" form="ðingana" lemma="ðing" part-of-speech="Nb" morphology= "-pnd--i-" gloss="l" />
+      </sentence>
+
+      <sentence id="2b" status="annotated">
+        <token id="22b" form="suæ"/>
+        <token id="23b" form="gesaldon"/>
+        <token id="24b" form="us" lemma="we" part-of-speech="Pp" morphology= "1pxs--i-" gloss="l" />
+        <token id="25b" form="ða" lemma="se" part-of-speech="Pd" morphology= "-pmn--i-" gloss="l" />
+        <token id="26b" form="ðe" lemma="þe" part-of-speech="G-" morphology= "------i-" gloss="l"/>
+        <token id="27b" form="from"/>
+        <token id="28b" form="frumma" lemma="fruma" part-of-speech="Nb" morphology= "-smx--u-" gloss="l" />
+        <token id="29b" form="ða" lemma="se" part-of-speech="Pd" morphology= "-pmn--i-" gloss="l"/> <!--check the part of speech!-->
+        <token id="30b" form="gesegon"/> <!--Ask George-->
+        <token id="31b" form="and"/>
+        <token id="32b" form="embehtmenn" lemma=" ambihtmann" part-of-speech="Nb" morphology= "-pmn--i-" gloss="l"/> <!--Ask George, lemma could be embehtmann too-->
+        <token id="33b" form="woeron"/>
+        <token id="34b" form="wordes" lemma="word" part-of-speech="Nb" morphology= "-sng--i-" gloss="l" />
+      </sentence>
+
+      <sentence id="3b" status="annotated">
+        <token id="35b" form="gesegen"/>
+        <token id="36b" form="was"/>
+        <token id="37b" form="æc"/>
+        <token id="38b" form="me" lemma="ic" part-of-speech="Pp" morphology= "1s-e--i-" gloss="l" />
+        <token id="39b" form="offylgde"/>
+        <token id="40b" form="from"/>
+        <token id="41b" form="fruma" lemma="fruma" part-of-speech="Nb" morphology= "-smx--u-" gloss="l" />
+        <token id="42b" form="alle" lemma="eal" part-of-speech="Py" morphology= "-pma--i-" gloss="l" /> <!--Ask George, nominalised adjectives? ðing=neuter -->
+        <token id="43b" form="georne"/>
+        <token id="44b" form="mið"/>
+        <token id="45b" form="endebrednise" lemma="endebyrd" part-of-speech="Nb" morphology= "-sfd--i-" gloss="l" /><!--Ask George, ness added to adjectives to form  abstract nouns -->
+        <token id="46b" form="ðe" lemma="þu" part-of-speech="Pp" morphology= "2s-d--i-" gloss="l" />
+        <token id="47b" form="auritta"/>
+        <token id="48b" form="ðu" lemma="þu" part-of-speech="Pp" morphology= "2s-n--i-" gloss="a" />
+        <token id="49b" form="gecorene" lemma="gecoren" part-of-speech="A-" morphology= "-smv--ib" gloss="l" /><!--copy from Latin morphology -->
+        <token id="50b" form="theofile" lemma="theophilus" part-of-speech="Ne" morphology="-smv--i-" gloss="l" /> <!--copy from Latin morphology -->
+      </sentence>
+      <sentence id="4b" status="annotated">
+        <token id="51b" form="þætte"/>
+        <token id="52b" form="ðu"/> <!--added subject -->
+        <token id="53b" form="ongette"/>
+        <token id="54b" form="hiora" lemma="hi" part-of-speech="Ps" morphology="3s-g--i-" gloss="l" />
+        <token id="55b" form="worda" lemma="word" part-of-speech="Nb" morphology="-png--i-" gloss="l" />
+        <token id="56b" form="of"/>
+        <token id="57b" form="ðæm" lemma="se" part-of-speech="Pr" morphology="-p-d--i-" gloss="l" />
+        <token id="58b" form="gelæred"/>
+        <token id="59b" form="arð"/>
+        <token id="60b" form="on"/> <!--added preposition -->
+        <token id="61b" form="soðfæstnise" lemma="soðfæstnes" part-of-speech="Nb" morphology="-sfd--i-" gloss="l" />
+      </sentence>
+
+      <sentence id="5b" status="unannotated">
+        <token id="62b" form="wæs"/>
+        <token id="63b" form="in"/>
+        <token id="64b" form="dagum" lemma="dæg" part-of-speech="Nb" morphology="-pmd--i-" gloss="l" />
+        <token id="65b" form="heroðes" lemma="herodes" part-of-speech="Ne" morphology="-smg--i-" gloss="l" />
+        <token id="66b" form="cyninges" lemma="cyning" part-of-speech="Nb" morphology="-smg--i-" gloss="l" />
+        <token id="67b" form="iudeæ" lemma="Iudea" part-of-speech="Ne" morphology="-sxx--i-" gloss="l" /> <!--Ask George, genitive singular should be -es, copy from Latin? -->
+        <token id="68b" form="sacerd" lemma="sacerd" part-of-speech="Nb" morphology="-smn--i-" gloss="l" />
+        <token id="69b" form="sum" lemma="sum" part-of-speech="Px" morphology="-smn--i-" gloss="l"  />
+        <token id="70b" form="mið"/>  <!--added preposition -->
+        <token id="71b" form="noma" lemma="nama" part-of-speech="Nb" morphology="-smx--n-" gloss="l" /> <!--missing -n-->
+        <token id="72b" form="of"/>
+        <token id="73b" form="lond" lemma="land" part-of-speech="Nb" morphology="-snx--n-" gloss="l" /> <!--missing -n-->
+        <token id="74b" form="abia" lemma="abia" part-of-speech="Ne" morphology="-smx--i-" gloss="l" /> <!--indeclinable noun-->
+        <token id="75b" form="and"/>
+        <token id="76b" form="wif" lemma="wif" part-of-speech="Nb" morphology="-snn--i-" gloss="l" />
+        <token id="77b" form="ðæm" lemma="se" part-of-speech="Pd" morphology="-smd--i-" gloss="l" />
+        <token id="78b" form="him" lemma="hi" part-of-speech="Pp" morphology="3smd--i-" gloss="v" />
+        <token id="79b" form="of"/>
+        <token id="80b" form="dohterum" lemma="dohtor" part-of-speech="Nb" morphology="-pfd--i-" gloss="l"  />
+        <token id="81b" form="aaron" lemma="aaron" part-of-speech="Ne" morphology="-smx--i-" gloss="l" />
+        <token id="82b" form="and"/>
+        <token id="83b" form="noma" lemma="nama" part-of-speech="Nb" morphology="-smn--i-" gloss="l" />
+        <token id="84b" form="his" lemma="hi" part-of-speech="Ps" morphology="3sog--ig" gloss="l" /><!--agrees with name not with elisabet??-->
+        <token id="85b" form="elizabeth" lemma="elisabeth" part-of-speech="Ne" morphology="-sfn--i-" gloss="l"/>
+      </sentence>
+
+    </div>
+  </source>
+</proiel>
