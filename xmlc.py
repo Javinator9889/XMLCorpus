@@ -18,11 +18,17 @@ from lxml import etree
 from warnings import warn
 from tabulate import tabulate
 from argparse import ArgumentParser
-from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from pylatexenc.latexencode import UnicodeToLatexEncoder
 
 # type hints
 from typing import Optional, Dict, List, Any, Union, TypeVar, Generic, Tuple
+
+encoder: UnicodeToLatexEncoder = \
+    UnicodeToLatexEncoder(unknown_char_policy='replace',
+                          replacement_latex_protection="braces",
+                          non_ascii_only=True)
 
 
 @dataclass
@@ -108,9 +114,12 @@ class Value(XMLItem):
         return Value(element.get('tag'), element.get('summary'))
 
     def to_table(self, tabletype="simple") -> str:
-        return tabulate([(self.tag, self.summary)],
-                        headers=('Tag', 'Summary'),
-                        tablefmt=tabletype)
+        table = tabulate([(self.tag, self.summary)],
+                         headers=('Tag', 'Summary'),
+                         tablefmt=tabletype)
+        return encoder.unicode_to_latex(table) \
+            if "latex" in tabletype \
+            else table
 
 
 @dataclass
@@ -127,10 +136,13 @@ class Field(XMLGroup[Value]):
                              headers=('Tag', 'Summary'),
                              tablefmt="plain")
         table = [(self.tag, tmp_table)]
-        return tabulate(table,
-                        headers=('Field tag', 'Values'),
-                        tablefmt=tabletype,
-                        colalign=("center",))
+        tab = tabulate(table,
+                       headers=('Field tag', 'Values'),
+                       tablefmt=tabletype,
+                       colalign=("center",))
+        return encoder.unicode_to_latex(tab) \
+            if "latex" in tabletype \
+            else tab
 
     def __getitem__(self, item: Union[str, int]):
         return self.fields[self.dirs[item]] if isinstance(item, str) \
@@ -217,13 +229,25 @@ class Annotation(XMLItem):
                                 headers=('Tag', 'Summary'),
                                 tablefmt=tabletype,
                                 colalign=("center", "center")))
-        return '\n'.join(res)
+        table = '\n'.join(res)
+        return encoder.unicode_to_latex(table) \
+            if "latex" in tabletype \
+            else table
 
 
 class AnnotationStatus(Enum):
     ANNOTATED = "annotated"
     UNANNOTATED = "unannotated"
     REVIEWED = "reviewed"
+
+
+def create_column_headers(first_header: str, tabletype: str) -> List[str]:
+    endcol = '' if "latex" in tabletype else '|'
+    return [f"{first_header}\t\t{endcol}",
+            f"Lemma\t\t{endcol}",
+            f"Part of speech\t{endcol}",
+            f"Morphology\t{endcol}",
+            f"Gloss\t\t{endcol}"]
 
 
 @dataclass
@@ -304,8 +328,7 @@ class Token(XMLItem):
         return token_desc
 
     def to_table(self, tabletype="simple", add_headers=True) -> str:
-        headers = ["Word\t\t|", "Lemma\t\t|", "Part of speech\t|",
-                   "Morphology\t|", "Gloss\t\t|"]
+        headers = create_column_headers(f"Word", tabletype)
         table_output = [[]] * len(headers)
         if add_headers:
             for i, header in zip(range(len(headers)), headers):
@@ -315,7 +338,10 @@ class Token(XMLItem):
             table_output[i].append(desc)
 
         align = ("center",) * len(table_output[0])
-        return tabulate(table_output, colalign=align, tablefmt="plain")
+        table = tabulate(table_output, colalign=align, tablefmt=tabletype)
+        return encoder.unicode_to_latex(table) \
+            if "latex" in tabletype \
+            else table
 
 
 @dataclass
@@ -347,12 +373,11 @@ class Sentence(XMLGroup[Token]):
         return sentence
 
     def to_table(self, tabletype="plain") -> str:
-        endcol = '' if "latex" in tabletype else '|'
-        table_output = [[f"{self.id} ({self.status.value})\t{endcol}"],
-                        [f"Lemma\t\t\t{endcol}"],
-                        [f"Part of speech\t{endcol}"],
-                        [f"Morphology\t\t{endcol}"],
-                        [f"Gloss\t\t\t{endcol}"]]
+        sentence_id_fmt = f"\\texttt{{{self.id}}}" if "latex" in tabletype \
+            else self.id
+        table_output = [[header] for header in create_column_headers(
+            f"{sentence_id_fmt} ({self.status.value})", tabletype
+        )]
         for token in self.fields:
             if token is None:
                 continue
@@ -360,7 +385,10 @@ class Sentence(XMLGroup[Token]):
             for i, data in zip(range(len(desc)), desc):
                 table_output[i].append(data)
         align = ("center",) * len(table_output[0])
-        return tabulate(table_output, colalign=align, tablefmt=tabletype)
+        table = tabulate(table_output, colalign=align, tablefmt=tabletype)
+        return encoder.unicode_to_latex(table) \
+            if "latex" in tabletype \
+            else table
 
     def side_by_side(self,
                      another: "Sentence",
@@ -374,18 +402,17 @@ class Sentence(XMLGroup[Token]):
             source = another
             other = self
 
-        endcol = '' if "latex" in tabletype else '|'
-        table_output = [[f"{source.id} ({source.status.value})\t{endcol}"],
-                        [f"Lemma\t\t\t{endcol}"],
-                        [f"Part of speech\t{endcol}"],
-                        [f"Morphology\t\t{endcol}"],
-                        [f"Gloss\t\t\t{endcol}"],
-
-                        [f"{other.id} ({other.status.value})\t{endcol}"],
-                        [f"Lemma\t\t\t{endcol}"],
-                        [f"Part of speech\t{endcol}"],
-                        [f"Morphology\t\t{endcol}"],
-                        [f"Gloss\t\t\t{endcol}"]]
+        sentence1_id_fmt = f"\\texttt{{{source.id}}}" if "latex" in tabletype \
+            else source.id
+        sentence2_id_fmt = f"\\texttt{{{other.id}}}" if "latex" in tabletype \
+            else other.id
+        headers = create_column_headers(
+            f"{sentence1_id_fmt} ({source.status.value})", tabletype
+        )
+        headers.extend(create_column_headers(f"{sentence2_id_fmt} ("
+                                             f"{other.status.value})",
+                                             tabletype))
+        table_output = [[header] for header in headers]
         for token in source.fields:
             if token is None:
                 continue
@@ -402,7 +429,7 @@ class Sentence(XMLGroup[Token]):
                     aligned_tokens = desc2
                 else:
                     for i, data in zip(range(len(desc2)), desc2):
-                        aligned_tokens[i] = f"{aligned_tokens[i]}\t{data[i]}"
+                        aligned_tokens[i] = f"{aligned_tokens[i]} - {data}"
 
             if aligned_tokens is None:
                 aligned_tokens = [''] * len(desc1)
@@ -415,7 +442,9 @@ class Sentence(XMLGroup[Token]):
         table = tabulate(table_output, colalign=align, tablefmt=tabletype)
         if "latex" in tabletype:
             table = table.replace("{tabular}{c", "{tabular}{c|", 1) \
-                .replace(f"\\\\\n {other.id}", f"\\\\\n\\hline\n {other.id}")
+                .replace(f"\\\\\n \\texttt{{{other.id}}}",
+                         f"\\\\[1ex]\n\\hline\n \\texttt{{{other.id}}}")
+            return encoder.unicode_to_latex(table)
         return table
 
 
@@ -539,7 +568,7 @@ def main(args):
 
     text1 = sources['text1']
     text2 = sources['text2']
-    print(text1.compare(text2, sentences=('0a', '1a'), tabletype="latex_raw"))
+    print(text1.compare(text2, tabletype="latex_raw"))
     # for _, source in sources.items():
     #     print(source.to_table(tabletype="latex_booktabs"))
 
