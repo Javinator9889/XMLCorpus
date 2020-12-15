@@ -23,7 +23,17 @@ from dataclasses import dataclass, field
 from pylatexenc.latexencode import UnicodeToLatexEncoder
 
 # type hints
-from typing import Optional, Dict, List, Any, Union, TypeVar, Generic, Tuple
+from typing import (
+    Optional,
+    Dict,
+    List,
+    Any,
+    Union,
+    TypeVar,
+    Generic,
+    Tuple,
+    Set
+)
 
 encoder: UnicodeToLatexEncoder = \
     UnicodeToLatexEncoder(unknown_char_policy='replace',
@@ -52,6 +62,13 @@ class XMLItem(ABC):
     def check_tag(element: etree._Element, tag: str):
         if element.tag != tag:
             raise ValueError(f"Element {element.tag}'s tag must be '{tag}'")
+
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__) and
+                self.tag == other.tag and self.item_tag == other.item_tag)
+
+    def __hash__(self):
+        return hash((self.tag, self.item_tag.hash))
 
 
 T = TypeVar('T')
@@ -93,6 +110,10 @@ class XMLGroup(XMLItem, Generic[T]):
 
         return cls(element.get('tag'), element.tag, fields, dirs)
 
+    def __eq__(self, other):
+        return super(XMLGroup, self).__eq__(other) and \
+               self.subitem_tag == other.subitem_tag
+
     @abstractmethod
     def to_table(self, tabletype="simple") -> str:
         pass
@@ -101,12 +122,15 @@ class XMLGroup(XMLItem, Generic[T]):
         return self.fields[self.dirs[item]] if isinstance(item, str) \
             else self.fields[item]
 
+    def __hash__(self):
+        return hash((self.tag, self.item_tag, self.subitem_tag))
+
 
 @dataclass
 class Value(XMLItem):
     tag: str
     summary: str
-    item_tag: str = field(default="value", init=False)
+    item_tag: str = field(default="value", init=False, hash=hash('value'))
 
     @staticmethod
     def parse(element: etree._Element, tag: str = 'value', **kwargs) -> "Value":
@@ -121,12 +145,15 @@ class Value(XMLItem):
             if "latex" in tabletype \
             else table
 
+    def __eq__(self, other):
+        return self.tag == other.tag and self.summary == other.summary
+
 
 @dataclass
 class Field(XMLGroup[Value]):
     cls: T = Value
-    item_tag: str = field(default='field', init=False)
-    subitem_tag: str = field(default='value', init=False)
+    item_tag: str = field(default='field', init=False, hash=hash('field'))
+    subitem_tag: str = field(default='value', init=False, hash=hash('value'))
 
     def to_table(self, tabletype="simple") -> str:
         table_contents = []
@@ -155,8 +182,8 @@ class Field(XMLGroup[Value]):
 @dataclass
 class Morphology(XMLGroup[Field]):
     cls: T = Field
-    item_tag: str = field(default='morphology', init=False)
-    subitem_tag: str = field(default='field', init=False)
+    item_tag: str = field(default='morphology', init=False, hash=hash('morph'))
+    subitem_tag: str = field(default='field', init=False, hash=hash('field'))
 
     def to_table(self, ignored="simple") -> str:
         return str(self)
@@ -234,6 +261,9 @@ class Annotation(XMLItem):
             if "latex" in tabletype \
             else table
 
+    def __hash__(self):
+        return hash((hash(self.morphology), self.parts_of_speech, self.gloss))
+
 
 class AnnotationStatus(Enum):
     ANNOTATED = "annotated"
@@ -241,8 +271,14 @@ class AnnotationStatus(Enum):
     REVIEWED = "reviewed"
 
 
+class AnnotationElements(Enum):
+    Morphology = "morphology"
+    PartsOfSpeech = "parts_of_speech"
+    Gloss = "gloss"
+
+
 def create_column_headers(first_header: str, tabletype: str) -> List[str]:
-    endcol = '' if "latex" in tabletype else '|'
+    endcol = '|' if "plain" in tabletype else ''
     return [f"{first_header}\t\t{endcol}",
             f"Lemma\t\t{endcol}",
             f"Part of speech\t{endcol}",
@@ -329,10 +365,7 @@ class Token(XMLItem):
 
     def to_table(self, tabletype="simple", add_headers=True) -> str:
         headers = create_column_headers(f"Word", tabletype)
-        table_output = [[]] * len(headers)
-        if add_headers:
-            for i, header in zip(range(len(headers)), headers):
-                table_output.insert(i, [header])
+        table_output = [[header] if add_headers else [] for header in headers]
         token_desc = self.describe()
         for i, desc in zip(range(len(token_desc)), token_desc):
             table_output[i].append(desc)
@@ -348,8 +381,8 @@ class Token(XMLItem):
 class Sentence(XMLGroup[Token]):
     id: str = ""
     cls = Token
-    item_tag: str = field(default='sentence', init=False)
-    subitem_tag: str = field(default='token', init=False)
+    item_tag: str = field(default='sentence', init=False, hash=hash('sentence'))
+    subitem_tag: str = field(default='token', init=False, hash=hash('token'))
     status: AnnotationStatus = field(default=AnnotationStatus.UNANNOTATED)
     alignment_id: Optional[str] = None
 
@@ -358,7 +391,7 @@ class Sentence(XMLGroup[Token]):
               element: etree._Element,
               subcls: T,
               tag: str = None,
-              **kwargs) -> "Optional[XMLGroup]":
+              **kwargs) -> "Optional[Sentence]":
         if element.tag in kwargs['ignored_tags']:
             return None
         sentence = super(Sentence, cls).parse(element,
@@ -389,6 +422,70 @@ class Sentence(XMLGroup[Token]):
         return encoder.unicode_to_latex(table) \
             if "latex" in tabletype \
             else table
+
+    def find_by(self, data: Dict[AnnotationElements, Union[Set[str], str]]) -> \
+            List[Token]:
+        tokens = []
+        for token in self.fields:
+            for element, topology in data.items():
+                attr = getattr(token, element.value)
+                # print(attr)
+                if attr is not None:
+                    try:
+                        if isinstance(attr, Morphology):
+                            if isinstance(topology, str):
+                                field, tag = topology.split('.', maxsplit=2)
+                                # print((field, tag))
+                                # print(attr[field])
+                                if attr[field] and attr[field].tag == tag:
+                                    tokens.append(token)
+                                    continue
+                            else:
+                                matching_tokens = []
+                                # print(topology)
+                                for topo in topology:
+                                    print(len(matching_tokens))
+                                    # print(topo)
+                                    # print(matching_tokens)
+                                    field, tag = topo.split('.', maxsplit=2)
+                                    # print((field, tag, attr))
+                                    # print(attr[field])
+                                    if attr[field] and attr[field].tag == tag:
+                                        print(
+                                            f"Tag {tag} matches field {field}")
+                                        # print("Tag matches!")
+                                        if len(matching_tokens) == 0:
+                                            print(f"Adding token {token.tag}")
+                                            matching_tokens.append(token)
+                                    else:
+                                        print(f"Token {token.id} does not "
+                                              f"match tag {tag}")
+                                        # print(token)
+                                        # print(token in matching_tokens)
+                                        if token in matching_tokens:
+                                            print(f"Removing token {token.tag}")
+                                            # print(len(matching_tokens))
+                                            matching_tokens.remove(token)
+                                            # print(len(matching_tokens))
+                                # print(tokens)
+                                tokens.extend(matching_tokens)
+                                # print(attr[field][tag])
+                                # print(attr[field].tag)
+                            # print(attr[tag])
+                            # if attr[field][tag] is not None:
+                            #     tokens.append(token)
+                            #     continue
+                        else:
+                            if isinstance(topology, set):
+                                raise ValueError(
+                                    "Data can be a set only when matching"
+                                    "morphology")
+                            if attr.tag == topology:
+                                tokens.append(token)
+                    except (KeyError, TypeError) as e:
+                        print(f"Captured error - {e}")
+                        continue
+        return tokens
 
     def side_by_side(self,
                      another: "Sentence",
@@ -447,6 +544,9 @@ class Sentence(XMLGroup[Token]):
             return encoder.unicode_to_latex(table)
         return table
 
+    def __eq__(self, other):
+        return self.id == other.id
+
 
 @dataclass
 class Source(XMLGroup[Sentence]):
@@ -454,9 +554,11 @@ class Source(XMLGroup[Sentence]):
     language: str = ''
     title: str = ''
     citation_part: str = ''
-    item_tag: str = field(default='source', init=False)
+    item_tag: str = field(default='source', init=False, hash=hash('source'))
     cls: T = Sentence
-    subitem_tag: str = field(default='sentence', init=False)
+    subitem_tag: str = field(default='sentence',
+                             init=False,
+                             hash=hash('sentence'))
     alignment_id: Optional[str] = None
     editorial_note: Optional[str] = None
     annotator: Optional[str] = None
@@ -468,7 +570,7 @@ class Source(XMLGroup[Sentence]):
               element: etree._Element,
               subcls: T,
               tag: str = None,
-              **kwargs) -> "XMLGroup":
+              **kwargs) -> "Optional[Source]":
         sid = element.get('id')
         language = element.get('language')
         alignment_id = element.get('alignment-id')
@@ -526,6 +628,14 @@ class Source(XMLGroup[Sentence]):
             tables.append(sentence1.side_by_side(sentence2, tabletype))
         return '\n\n'.join(tables)
 
+    def find_words_by(self,
+                      data: Dict[AnnotationElements, Union[Set[str], str]]) -> \
+            List[Token]:
+        results = []
+        for field in self.fields:
+            results.extend(field.find_by(data))
+        return results
+
 
 def main(args):
     parser = etree.XMLParser(remove_comments=True)
@@ -549,7 +659,13 @@ def main(args):
 
     text1 = sources['text1']
     text2 = sources['text2']
-    print(text1.compare(text2, tabletype="latex_raw"))
+    # print(text1.compare(text2, tabletype="latex_raw"))
+    for token in text1.find_words_by({
+        AnnotationElements.Morphology: {"person.1", "number.s"}
+    }):
+        # print(token)
+        # print(len(token))
+        print(token.to_table(tabletype="grid"))
     # for _, source in sources.items():
     #     print(source.to_table(tabletype="latex_booktabs"))
 
