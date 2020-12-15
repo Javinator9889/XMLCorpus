@@ -639,18 +639,12 @@ def main(args):
 
     text1 = sources['text1']
     text2 = sources['text2']
-    # print(text1.compare(text2, tabletype="grid"))
+    print(text1.compare(text2, tabletype="grid"))
     for token in text1.find_words_by({
         AnnotationElements.Morphology: {"number.s", "gender.m"},
         AnnotationElements.PartsOfSpeech: 'Ne'
     }):
-        pass
-        # print(token)
-        # print(len(token))
-        # print(token)
         print(token.to_table(tabletype="grid"))
-    # for _, source in sources.items():
-    #     print(source.to_table(tabletype="latex_booktabs"))
 
 
 if __name__ == '__main__':
