@@ -17,6 +17,7 @@ from enum import Enum
 from lxml import etree
 from warnings import warn
 from tabulate import tabulate
+from collections import defaultdict
 from argparse import ArgumentParser
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -273,7 +274,7 @@ class AnnotationStatus(Enum):
 
 class AnnotationElements(Enum):
     Morphology = "morphology"
-    PartsOfSpeech = "parts_of_speech"
+    PartsOfSpeech = "part_of_speech"
     Gloss = "gloss"
 
 
@@ -296,7 +297,7 @@ class Token(XMLItem):
     morphology: Optional[Morphology] = None
     gloss: Optional[Value] = None
     tag: str = field(default=None, init=False)
-    item_tag: str = field(default='token', init=False)
+    item_tag: str = field(default='token', init=False, hash=hash('token'))
 
     @staticmethod
     def parse(element: etree._Element,
@@ -323,9 +324,10 @@ class Token(XMLItem):
                                      f"declared (were "
                                      f"{len(annotation.morphology.fields)})")
                             else:
-                                warn(f"Non-identified morphology item "
-                                     f"'{field}' at position "
-                                     f"'{annotation.morphology[i].tag}'")
+                                warn(f"Morphology with tag '{field}' not "
+                                     f"found in field "
+                                     f"'{annotation.morphology[i].tag}' ("
+                                     f"token with ID: '{token.id}')")
                 attr_value = Morphology(tag=None, fields=fields, dirs=dirs)
             elif attr == 'part-of-speech':
                 attr_value = annotation.parts_of_speech[value]
@@ -341,7 +343,7 @@ class Token(XMLItem):
     def describe(self, tabletype="simple") -> List[str]:
         form = f"\\textbf{{{self.form}}}" if "latex" in tabletype else self.form
         lemma = f"\\textit{{{self.lemma}}}" \
-            if "latex" in tabletype and self.lemma is not None else ''
+            if "latex" in tabletype else self.lemma or ''
         token_desc = [form, lemma]
         if self.part_of_speech is not None:
             token_desc.insert(2, self.part_of_speech.summary)
@@ -366,7 +368,7 @@ class Token(XMLItem):
     def to_table(self, tabletype="simple", add_headers=True) -> str:
         headers = create_column_headers(f"Word", tabletype)
         table_output = [[header] if add_headers else [] for header in headers]
-        token_desc = self.describe()
+        token_desc = self.describe(tabletype)
         for i, desc in zip(range(len(token_desc)), token_desc):
             table_output[i].append(desc)
 
@@ -375,6 +377,13 @@ class Token(XMLItem):
         return encoder.unicode_to_latex(table) \
             if "latex" in tabletype \
             else table
+
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__) and
+                self.tag == other.tag and self.item_tag == other.item_tag)
+
+    def __hash__(self):
+        return hash((self.tag, hash(self.item_tag)))
 
 
 @dataclass
@@ -425,67 +434,38 @@ class Sentence(XMLGroup[Token]):
 
     def find_by(self, data: Dict[AnnotationElements, Union[Set[str], str]]) -> \
             List[Token]:
-        tokens = []
+        found_tokens = defaultdict(set)
+        keys = set()
         for token in self.fields:
             for element, topology in data.items():
+                keys |= topology if isinstance(topology, set) else {topology}
                 attr = getattr(token, element.value)
-                # print(attr)
                 if attr is not None:
-                    try:
-                        if isinstance(attr, Morphology):
-                            if isinstance(topology, str):
-                                field, tag = topology.split('.', maxsplit=2)
-                                # print((field, tag))
-                                # print(attr[field])
-                                if attr[field] and attr[field].tag == tag:
-                                    tokens.append(token)
-                                    continue
-                            else:
-                                matching_tokens = []
-                                # print(topology)
-                                for topo in topology:
-                                    print(len(matching_tokens))
-                                    # print(topo)
-                                    # print(matching_tokens)
-                                    field, tag = topo.split('.', maxsplit=2)
-                                    # print((field, tag, attr))
-                                    # print(attr[field])
-                                    if attr[field] and attr[field].tag == tag:
-                                        print(
-                                            f"Tag {tag} matches field {field}")
-                                        # print("Tag matches!")
-                                        if len(matching_tokens) == 0:
-                                            print(f"Adding token {token.tag}")
-                                            matching_tokens.append(token)
-                                    else:
-                                        print(f"Token {token.id} does not "
-                                              f"match tag {tag}")
-                                        # print(token)
-                                        # print(token in matching_tokens)
-                                        if token in matching_tokens:
-                                            print(f"Removing token {token.tag}")
-                                            # print(len(matching_tokens))
-                                            matching_tokens.remove(token)
-                                            # print(len(matching_tokens))
-                                # print(tokens)
-                                tokens.extend(matching_tokens)
-                                # print(attr[field][tag])
-                                # print(attr[field].tag)
-                            # print(attr[tag])
-                            # if attr[field][tag] is not None:
-                            #     tokens.append(token)
-                            #     continue
+                    if isinstance(attr, Morphology):
+                        if isinstance(topology, str):
+                            field, tag = topology.split('.', maxsplit=2)
+                            if attr[field] and attr[field].tag == tag:
+                                found_tokens[topology] |= {token}
                         else:
-                            if isinstance(topology, set):
-                                raise ValueError(
-                                    "Data can be a set only when matching"
-                                    "morphology")
-                            if attr.tag == topology:
-                                tokens.append(token)
-                    except (KeyError, TypeError) as e:
-                        print(f"Captured error - {e}")
-                        continue
-        return tokens
+                            for topo in topology:
+                                field, tag = topo.split('.', maxsplit=2)
+                                if attr[field] and attr[field].tag == tag:
+                                    found_tokens[topo] |= {token}
+                    else:
+                        if isinstance(topology, set):
+                            raise ValueError(
+                                "Data can be a set only when matching"
+                                "morphology")
+                        if attr.tag == topology:
+                            found_tokens[topology] |= {token}
+        tokens = set()
+        for i, key in zip(range(len(keys)), keys):
+            token = found_tokens[key]
+            if len(tokens) == 0 and i == 0:
+                tokens = token
+            else:
+                tokens &= token
+        return list(tokens)
 
     def side_by_side(self,
                      another: "Sentence",
@@ -659,12 +639,15 @@ def main(args):
 
     text1 = sources['text1']
     text2 = sources['text2']
-    # print(text1.compare(text2, tabletype="latex_raw"))
+    # print(text1.compare(text2, tabletype="grid"))
     for token in text1.find_words_by({
-        AnnotationElements.Morphology: {"person.1", "number.s"}
+        AnnotationElements.Morphology: {"number.s", "gender.m"},
+        AnnotationElements.PartsOfSpeech: 'Ne'
     }):
+        pass
         # print(token)
         # print(len(token))
+        # print(token)
         print(token.to_table(tabletype="grid"))
     # for _, source in sources.items():
     #     print(source.to_table(tabletype="latex_booktabs"))
