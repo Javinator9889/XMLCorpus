@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
 # type hints
-from typing import Optional, Dict, List, Any, Union, TypeVar, Generic
+from typing import Optional, Dict, List, Any, Union, TypeVar, Generic, Tuple
 
 
 @dataclass
@@ -90,6 +90,10 @@ class XMLGroup(XMLItem, Generic[T]):
     @abstractmethod
     def to_table(self, tabletype="simple") -> str:
         pass
+
+    def __getitem__(self, item: Union[str, int]):
+        return self.fields[self.dirs[item]] if isinstance(item, str) \
+            else self.fields[item]
 
 
 @dataclass
@@ -267,11 +271,18 @@ class Token(XMLItem):
                 attr_value = annotation.parts_of_speech[value]
             elif attr == 'gloss':
                 attr_value = annotation.gloss[value]
+            elif attr == 'alignment-id':
+                attr_value = value.split(',')
+            attr = attr.replace('-', '_')
             setattr(token, attr, attr_value)
+        token.tag = token.id
         return token
 
-    def describe(self) -> List[str]:
-        token_desc = [self.form, self.lemma or '']
+    def describe(self, tabletype="simple") -> List[str]:
+        form = f"\\textbf{{{self.form}}}" if "latex" in tabletype else self.form
+        lemma = f"\\textit{{{self.lemma}}}" \
+            if "latex" in tabletype and self.lemma is not None else ''
+        token_desc = [form, lemma]
         if self.part_of_speech is not None:
             token_desc.insert(2, self.part_of_speech.summary)
         else:
@@ -287,6 +298,9 @@ class Token(XMLItem):
             token_desc.insert(4, self.gloss.summary)
         else:
             token_desc.insert(4, '')
+        if "latex" in tabletype:
+            for i in range(1, len(token_desc)):
+                token_desc[i] = f"{{\\small {token_desc[i]}}}"
         return token_desc
 
     def to_table(self, tabletype="simple", add_headers=True) -> str:
@@ -319,7 +333,7 @@ class Sentence(XMLGroup[Token]):
               subcls: T,
               tag: str = None,
               **kwargs) -> "Optional[XMLGroup]":
-        if element.tag == 'title':
+        if element.tag in kwargs['ignored_tags']:
             return None
         sentence = super(Sentence, cls).parse(element,
                                               subcls,
@@ -328,15 +342,17 @@ class Sentence(XMLGroup[Token]):
         sentence.id = element.get('id')
         sentence.status = AnnotationStatus[element.get('status').upper()]
         sentence.alignment_id = element.get('alignment-id')
+        sentence.tag = sentence.id
 
         return sentence
 
     def to_table(self, tabletype="plain") -> str:
-        table_output = [[f"{self.id} ({self.status.value})\t|"],
-                        ["Lemma\t\t|"],
-                        ["Part of speech\t|"],
-                        ["Morphology\t|"],
-                        ["Gloss\t\t|"]]
+        endcol = '' if "latex" in tabletype else '|'
+        table_output = [[f"{self.id} ({self.status.value})\t{endcol}"],
+                        [f"Lemma\t\t\t{endcol}"],
+                        [f"Part of speech\t{endcol}"],
+                        [f"Morphology\t\t{endcol}"],
+                        [f"Gloss\t\t\t{endcol}"]]
         for token in self.fields:
             if token is None:
                 continue
@@ -345,6 +361,62 @@ class Sentence(XMLGroup[Token]):
                 table_output[i].append(data)
         align = ("center",) * len(table_output[0])
         return tabulate(table_output, colalign=align, tablefmt=tabletype)
+
+    def side_by_side(self,
+                     another: "Sentence",
+                     tabletype="plain") -> str:
+        if self.alignment_id != another.id and another.alignment_id != self.id:
+            raise ValueError("Sentences are not aligned!")
+        if self.alignment_id == another.id:
+            source = self
+            other = another
+        else:
+            source = another
+            other = self
+
+        endcol = '' if "latex" in tabletype else '|'
+        table_output = [[f"{source.id} ({source.status.value})\t{endcol}"],
+                        [f"Lemma\t\t\t{endcol}"],
+                        [f"Part of speech\t{endcol}"],
+                        [f"Morphology\t\t{endcol}"],
+                        [f"Gloss\t\t\t{endcol}"],
+
+                        [f"{other.id} ({other.status.value})\t{endcol}"],
+                        [f"Lemma\t\t\t{endcol}"],
+                        [f"Part of speech\t{endcol}"],
+                        [f"Morphology\t\t{endcol}"],
+                        [f"Gloss\t\t\t{endcol}"]]
+        for token in source.fields:
+            if token is None:
+                continue
+            desc1 = token.describe(tabletype)
+            for i, data in zip(range(len(desc1)), desc1):
+                table_output[i].append(data)
+
+            aligned_tokens = None
+            aligned_token_ids = token.alignment_id or []
+            for token_id in aligned_token_ids:
+                other_token = other[token_id]
+                desc2 = other_token.describe(tabletype)
+                if aligned_tokens is None:
+                    aligned_tokens = desc2
+                else:
+                    for i, data in zip(range(len(desc2)), desc2):
+                        aligned_tokens[i] = f"{aligned_tokens[i]}\t{data[i]}"
+
+            if aligned_tokens is None:
+                aligned_tokens = [''] * len(desc1)
+
+            start = len(desc1)
+            stop = start + len(aligned_tokens)
+            for i, data in zip(range(start, stop), aligned_tokens):
+                table_output[i].append(data)
+        align = ("center",) * len(table_output[0])
+        table = tabulate(table_output, colalign=align, tablefmt=tabletype)
+        if "latex" in tabletype:
+            table = table.replace("{tabular}{c", "{tabular}{c|", 1) \
+                .replace(f"\\\\\n {other.id}", f"\\\\\n\\hline\n {other.id}")
+        return table
 
 
 @dataclass
@@ -368,7 +440,7 @@ class Source(XMLGroup[Sentence]):
               subcls: T,
               tag: str = None,
               **kwargs) -> "XMLGroup":
-        id = element.get('id')
+        sid = element.get('id')
         language = element.get('language')
         alignment_id = element.get('alignment-id')
         title = element.find('title').text
@@ -381,7 +453,7 @@ class Source(XMLGroup[Sentence]):
                                           subcls,
                                           tag,
                                           **kwargs)
-        source.id = id
+        source.id = sid
         source.language = language
         source.alignment_id = alignment_id
         source.title = title
@@ -390,6 +462,7 @@ class Source(XMLGroup[Sentence]):
         source.annotator = annotator
         source.reviewer = reviewer
         source.original_url = original_url
+        source.tag = sid
 
         return source
 
@@ -398,6 +471,50 @@ class Source(XMLGroup[Sentence]):
         for sentence in self.fields:
             sentences.append(sentence.to_table(tabletype))
         return '\n\n'.join(sentences)
+
+    def compare(self, another: "Source",
+                sentences: Tuple[str, ...] = (),
+                status: Optional[AnnotationStatus] = None,
+                tabletype: str = "simple") -> str:
+        if self.alignment_id != another.id and another.alignment_id != self.id:
+            raise ValueError("Sources are not aligned!")
+        if self.alignment_id == another.id:
+            source = self
+            other = another
+        else:
+            source = another
+            other = self
+        tables = []
+        for sentence1 in source.fields:
+            aligned_sentence_id = sentence1.alignment_id
+            sentence2 = other.fields[other.dirs[aligned_sentence_id]]
+            if len(sentences) > 0:
+                if sentence1.id not in sentences:
+                    continue
+            if status is not None:
+                if sentence1.status != status or sentence2.status != status:
+                    continue
+            tables.append(sentence1.side_by_side(sentence2, tabletype))
+        # print(self.dirs)
+        # print(self.fields)
+        # for sentence1 in source.fields:
+        #     res = []
+        #     # print(f"{key} - {idx}")
+        #     # sentence1 = source.fields[idx]
+        #     other_key = sentence1.alignment_id
+        #     sentence2 = other.fields[another.dirs[other_key]]
+        #     if len(sentences) > 0:
+        #         if sentence1.id not in sentences:
+        #             continue
+        #     if status is not None:
+        #         if sentence1.status != status or sentence2.status != status:
+        #             continue
+        #     sentence_tt = tabletype if "latex" in tabletype else "plain"
+        #     res.append([sentence1.to_table(tabletype=sentence_tt)])
+        #     res.append([sentence2.to_table(tabletype=sentence_tt)])
+        #
+        #     tables.append(tabulate(res, tablefmt=tabletype))
+        return '\n\n'.join(tables)
 
 
 def main(args):
@@ -413,13 +530,18 @@ def main(args):
     annotation = Annotation.parse(annotation_element)
     print(annotation)
 
-    sources = {}
+    sources: Dict[str, Source] = {}
     for source in tree.findall('source'):
-        src = Source.parse(source, Sentence, annotation=annotation)
+        src = Source.parse(source, Sentence,
+                           annotation=annotation,
+                           ignored_tags={'title'})
         sources[src.id] = src
 
-    for _, source in sources.items():
-        print(source.to_table(tabletype="latex_booktabs"))
+    text1 = sources['text1']
+    text2 = sources['text2']
+    print(text1.compare(text2, sentences=('0a', '1a'), tabletype="latex_raw"))
+    # for _, source in sources.items():
+    #     print(source.to_table(tabletype="latex_booktabs"))
 
 
 if __name__ == '__main__':
