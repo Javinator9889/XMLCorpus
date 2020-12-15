@@ -524,25 +524,6 @@ class Source(XMLGroup[Sentence]):
                 if sentence1.status != status or sentence2.status != status:
                     continue
             tables.append(sentence1.side_by_side(sentence2, tabletype))
-        # print(self.dirs)
-        # print(self.fields)
-        # for sentence1 in source.fields:
-        #     res = []
-        #     # print(f"{key} - {idx}")
-        #     # sentence1 = source.fields[idx]
-        #     other_key = sentence1.alignment_id
-        #     sentence2 = other.fields[another.dirs[other_key]]
-        #     if len(sentences) > 0:
-        #         if sentence1.id not in sentences:
-        #             continue
-        #     if status is not None:
-        #         if sentence1.status != status or sentence2.status != status:
-        #             continue
-        #     sentence_tt = tabletype if "latex" in tabletype else "plain"
-        #     res.append([sentence1.to_table(tabletype=sentence_tt)])
-        #     res.append([sentence2.to_table(tabletype=sentence_tt)])
-        #
-        #     tables.append(tabulate(res, tablefmt=tabletype))
         return '\n\n'.join(tables)
 
 
