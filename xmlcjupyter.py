@@ -84,7 +84,8 @@ def load_source(file: widgets.FileUpload = None,
             annotation_data = annotations_url.value \
                 if annotations_url is not None and annotations_url.value != '' \
                 else BytesIO(annotations_file
-                             .value[annotations_file.metadata[0]['name']]['content'])
+                             .value[annotations_file.metadata[0]['name']][
+                                 'content'])
         else:
             annotation_data = None
     else:
@@ -119,7 +120,8 @@ def show_table(table, tabletype):
     display(Latex(table)) if "latex" in tabletype else display(table)
 
 
-def display_source(source: Union[Dict[str, Source], Source], tabletype="latex"):
+def display_source(source: Union[Dict[str, Source], Source],
+                   tabletype="latex_raw"):
     def show_source(src: Source):
         print(src.to_table(tabletype))
 
@@ -134,7 +136,7 @@ def compare(source: Source,
             another_source: Source,
             sentences: Tuple[str, ...] = (),
             status: Optional[AnnotationStatus] = None,
-            tabletype="latex"):
+            tabletype="latex_raw"):
     comparison = source.compare(another_source,
                                 sentences=sentences,
                                 status=status,
@@ -144,7 +146,7 @@ def compare(source: Source,
 
 def find_words_by(data: Dict[AnnotationElements, Union[set, str]],
                   source: Union[Dict[str, Source], Source],
-                  tabletype="latex"):
+                  tabletype="latex_raw"):
     if isinstance(source, Source):
         source = {'': source}
     for src in source.values():
