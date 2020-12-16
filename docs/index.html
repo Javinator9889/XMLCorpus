@@ -33,7 +33,7 @@
 <span id="welcome-to-xmlcorpus-s-documentation"></span><h1>Welcome to XMLCorpus’s documentation!<a class="headerlink" href="#module-xmlc" title="Permalink to this headline">¶</a></h1>
 <dl class="class">
 <dt id="xmlc.Annotation">
-<em class="property">class </em><code class="descclassname">xmlc.</code><code class="descname">Annotation</code><span class="sig-paren">(</span><em>tag: Optional[str], morphology: xmlc.Morphology, parts_of_speech: Optional[xmlc.Field] = None, gloss: Optional[xmlc.Field] = None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xmlc.html#Annotation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xmlc.Annotation" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">xmlc.</code><code class="descname">Annotation</code><span class="sig-paren">(</span><em>tag: Optional[str], item_tag: str, morphology: xmlc.Morphology, parts_of_speech: Optional[xmlc.Field] = None, gloss: Optional[xmlc.Field] = None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xmlc.html#Annotation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xmlc.Annotation" title="Permalink to this definition">¶</a></dt>
 <dd><p>Master class containing all possible annotations that can exist in a XML
 file.</p>
 <dl class="attribute">
@@ -999,7 +999,7 @@ about formatting at: <a class="reference external" href="https://pypi.org/projec
 
 <dl class="class">
 <dt id="xmlc.XMLGroup">
-<em class="property">class </em><code class="descclassname">xmlc.</code><code class="descname">XMLGroup</code><span class="sig-paren">(</span><em>tag: Optional[str], cls: T, fields: List[T] = &lt;factory&gt;, dirs: Dict[str, int] = &lt;factory&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xmlc.html#XMLGroup"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xmlc.XMLGroup" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">xmlc.</code><code class="descname">XMLGroup</code><span class="sig-paren">(</span><em>tag: Optional[str], item_tag: str, cls: T, fields: List[T] = &lt;factory&gt;, dirs: Dict[str, int] = &lt;factory&gt;</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xmlc.html#XMLGroup"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xmlc.XMLGroup" title="Permalink to this definition">¶</a></dt>
 <dd><p>Specialization of <a class="reference internal" href="#xmlc.XMLItem" title="xmlc.XMLItem"><code class="xref py py-class docutils literal notranslate"><span class="pre">XMLItem</span></code></a> for containing a variable set
 of fields of type <a class="reference internal" href="#xmlc.T" title="xmlc.T"><code class="xref py py-data docutils literal notranslate"><span class="pre">T</span></code></a>.</p>
 <dl class="docutils">
@@ -1129,7 +1129,7 @@ about formatting at: <a class="reference external" href="https://pypi.org/projec
 
 <dl class="class">
 <dt id="xmlc.XMLItem">
-<em class="property">class </em><code class="descclassname">xmlc.</code><code class="descname">XMLItem</code><span class="sig-paren">(</span><em>tag: Optional[str]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xmlc.html#XMLItem"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xmlc.XMLItem" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">xmlc.</code><code class="descname">XMLItem</code><span class="sig-paren">(</span><em>tag: Optional[str], item_tag: str</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/xmlc.html#XMLItem"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#xmlc.XMLItem" title="Permalink to this definition">¶</a></dt>
 <dd><p>Base XML wrapper class. This item consists on a dataclass
 with basically two fields:</p>
 <blockquote>
