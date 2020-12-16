@@ -564,7 +564,7 @@ class Token(XMLItem):
                             idx += 1
                         except (KeyError, IndexError):
                             if i >= len(annotation.morphology.fields):
-                                warn(f"More morphologies {i + 1} than "
+                                warn(f"More morphologies ({i + 1}) than "
                                      f"previously declared in annotations ("
                                      f"were "
                                      f"{len(annotation.morphology.fields)})")
