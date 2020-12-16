@@ -63,7 +63,7 @@ class XMLItem(ABC):
     The XML tag identifier, overriden by subclasses.
     """
 
-    item_tag: str = field(init=False, default=None, hash=hash(None))
+    item_tag: str
     """
     The XML tag itself, overriden by subclasses.
     """
