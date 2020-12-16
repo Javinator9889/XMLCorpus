@@ -44,20 +44,82 @@ encoder: UnicodeToLatexEncoder = \
 
 @dataclass
 class XMLItem(ABC):
+    """
+    Base XML wrapper class. This item consists on a dataclass
+    with basically two fields:
+     + `tag`, containing the XML tag identifier.
+     + `item_tag`, containing the XML tag itself.
+
+    This abstract class defines two abstract methods that must be
+    override:
+     - :func:`parse`
+     - :func:`to_table`
+
+    Its main function is to simplify and contain basic XML data types.
+    """
+
     tag: Optional[str]
-    item_tag: field(init=False, default=None)
+    """
+    The XML tag identifier, overriden by subclasses.
+    """
+
+    item_tag: str = field(init=False, default=None, hash=hash(None))
+    """
+    The XML tag itself, overriden by subclasses.
+    """
 
     @staticmethod
     @abstractmethod
     def parse(element: etree._Element,
               tag: str,
               **kwargs) -> "Optional[XMLItem]":
-        """Parses the element into the selected tag. This method must be
-        implemented by all subclasses"""
+        """
+        With the given :class:`lxml.etree.Element`, parses the :attr:`item_tag`
+        and creates a new :class:`XMLItem` with its data.
+
+        :param lxml.etree._Element element: the element to parse.
+        :param str tag: the XML tag itself.
+        :param kwargs: arbitrary arguments for custom parsing options.
+        :return: the new tag.
+        :rtype: XMLItem
+        :raises ValueError: if the `element.tag` is different than `tag`.
+        """
 
     @abstractmethod
     def to_table(self, tabletype="simple") -> str:
-        pass
+        """
+        Represents the :class:`XMLItem` by a table.
+
+        :param str tabletype: the table format to use. The following formats
+            are available:
+             + "plain"
+             + "simple"
+             + "github"
+             + "grid"
+             + "fancy_grid"
+             + "pipe"
+             + "orgtbl"
+             + "jira"
+             + "presto"
+             + "pretty"
+             + "psql"
+             + "rst"
+             + "mediawiki"
+             + "moinmoin"
+             + "youtrack"
+             + "html"
+             + "latex"
+             + "latex_raw"
+             + "latex_booktabs"
+             + "textile"
+
+        .. seealso::
+           Table formats are defined by :mod:`tabulate` - more information
+           about formatting at: https://pypi.org/project/tabulate/
+
+        :return: the table representation of the :class:`XMLItem`.
+        :rtype: str
+        """
 
     @staticmethod
     def check_tag(element: etree._Element, tag: str):
@@ -65,22 +127,66 @@ class XMLItem(ABC):
             raise ValueError(f"Element {element.tag}'s tag must be '{tag}'")
 
     def __eq__(self, other):
+        """
+        Checks if another :class:`XMLItem` equals to us.
+
+        :param XMLItem other: the other item to check.
+
+        :return: `True` if items share :attr:`tag` and :attr:`item_tag`,
+            `False` otherwise.
+        :rtype: bool
+        """
         return (isinstance(other, self.__class__) and
                 self.tag == other.tag and self.item_tag == other.item_tag)
 
     def __hash__(self):
+        """
+        Generates a unique representation of this object. Uses both :attr:`tag`
+        and :attr:`item_tag` for this purpose.
+
+        :return: the class hash.
+        :rtype: int
+        """
         return hash((self.tag, self.item_tag.hash))
 
 
 T = TypeVar('T')
+"""
+Generic type for designating groups of XML tags.
+"""
 
 
 @dataclass
 class XMLGroup(XMLItem, Generic[T]):
+    """
+    Specialization of :class:`XMLItem` for containing a variable set
+    of fields of type :data:`T`.
+
+    Those fields can be accessed in three ways:
+     + By providing the index using :attr:`fields`.
+     + By providing the field tag by using :attr:`dirs` and :attr:`fields`.
+     + By direct access using both index or tag.
+    """
+
     cls: T
+    """
+    The generic class used when parsing found subclasses.
+    """
+
     subitem_tag: str = field(default=None, init=False)
+    """
+    The containing :data:`T` tag.
+    """
+
     fields: List[T] = field(default_factory=list)
+    """
+    List of arbitrary length containing the :data:`T` objects.
+    """
+
     dirs: Dict[str, int] = field(default_factory=dict)
+    """
+    Map containing the :data:`T` identifiers and its position in :attr:`fields`.
+    """
 
     @classmethod
     def parse(cls,
@@ -88,6 +194,22 @@ class XMLGroup(XMLItem, Generic[T]):
               subcls: T,
               tag: str = None,
               **kwargs) -> "Optional[XMLGroup]":
+        """
+        With the given :class:`lxml.etree.Element`, parses the :attr:`item_tag`
+        and creates a new :class:`XMLGroup` with its data. In addition to
+        :class:`XMLItem`, finds and parses any subitem contained by the tag.
+
+        :param lxml.etree._Element element: the element to parse.
+        :param T subcls: the subclass type used when parsing found objects.
+        :param str tag: the XML tag itself.
+        :param kwargs: arbitrary arguments for custom parsing options.
+        :return: the new group of tags.
+        :rtype: XMLItem
+        :raises ValueError: if the `element.tag` is different than `tag`.
+        :raises AttributeError: if `subcls` is not a subclass of
+            :class:`XMLItem` or :class:`XMLGroup`.
+
+        """
         if not issubclass(subcls, XMLItem) and not issubclass(subcls, XMLGroup):
             raise AttributeError(f"Class {subcls} must inherit from XMLItem or "
                                  f"XMLGroup")
@@ -129,8 +251,21 @@ class XMLGroup(XMLItem, Generic[T]):
 
 @dataclass
 class Value(XMLItem):
+    """
+    The simplest XML item available, containing both a :attr:`tag` and a
+    :attr:`summary`.
+    """
+
     tag: str
+    """
+    :class:`Value` identifier tag.
+    """
+
     summary: str
+    """
+    :class:`Value` summary.
+    """
+
     item_tag: str = field(default="value", init=False, hash=hash('value'))
 
     @staticmethod
@@ -147,11 +282,15 @@ class Value(XMLItem):
             else table
 
     def __eq__(self, other):
-        return self.tag == other.tag and self.summary == other.summary
+        return super(Value, self).__eq__(other) and \
+               self.tag == other.tag and self.summary == other.summary
 
 
 @dataclass
 class Field(XMLGroup[Value]):
+    """
+    Class grouping a set of :class:`Value`s.
+    """
     cls: T = Value
     item_tag: str = field(default='field', init=False, hash=hash('field'))
     subitem_tag: str = field(default='value', init=False, hash=hash('value'))
@@ -182,6 +321,11 @@ class Field(XMLGroup[Value]):
 
 @dataclass
 class Morphology(XMLGroup[Field]):
+    """
+    The morphology contains a group of fields containing values. This
+    describes how the text's tokens are.
+    """
+
     cls: T = Field
     item_tag: str = field(default='morphology', init=False, hash=hash('morph'))
     subitem_tag: str = field(default='field', init=False, hash=hash('field'))
@@ -191,6 +335,18 @@ class Morphology(XMLGroup[Field]):
 
     def get(self, item: Union[str, int], default_value: Any = None) -> \
             Union[Field, Any]:
+        """
+        Searchs for an item, given its position or its tag. If not found,
+        returns the default value.
+
+        :param item: the item to look for. Can be the index
+            or the identifier tag.
+        :type item: str or int
+        :param Any default_value: the value to return when not found.
+
+        :return: the found :class:`Field` or the default value.
+        :rtype: Field or Any
+        """
         try:
             return self.fields[item] if isinstance(item, int) \
                 else self.fields[self.dirs[item]]
@@ -209,16 +365,37 @@ class Morphology(XMLGroup[Field]):
 
 @dataclass
 class Annotation(XMLItem):
+    """
+    Master class containing all possible annotations that can exist in a XML
+    file.
+    """
+
     morphology: Morphology
+    """
+    The annotation's morphology.
+    """
+
     parts_of_speech: Optional[Field] = field(default=None)
+    """
+    The annotation's part of speech - can be `None`.
+    
+    :type: Field or None
+    """
+
     gloss: Optional[Field] = field(default=None)
+    """
+    The annotation's glossary - can be `None`.
+    
+    :type: Field or None
+    """
 
     def __str__(self):
         return self.to_table(tabletype="fancy_grid")
 
     @staticmethod
     def parse(annotation: etree._Element,
-              tag: str = 'annotation', **kwargs) -> "Annotation":
+              tag: str = 'annotation',
+              **kwargs) -> "Annotation":
         XMLItem.check_tag(annotation, tag)
         morphology = Morphology.parse(element=annotation.find('morphology'),
                                       subcls=Morphology.cls)
@@ -267,18 +444,50 @@ class Annotation(XMLItem):
 
 
 class AnnotationStatus(Enum):
+    """
+    Enumeration containing the three possible statuses for a sentence:
+     1. Annotated
+     2. Unannotated
+     3. Reviewed
+    """
     ANNOTATED = "annotated"
     UNANNOTATED = "unannotated"
     REVIEWED = "reviewed"
 
 
 class AnnotationElements(Enum):
+    """
+    Enumeration containing the possible parts that conforms an annotation.
+    Can be:
+     1. Morphology
+     2. Parts of speech
+     3. Gloss
+    """
     Morphology = "morphology"
     PartsOfSpeech = "part_of_speech"
     Gloss = "gloss"
 
 
 def create_column_headers(first_header: str, tabletype: str) -> List[str]:
+    """
+    With the given first header and the table type, creates a list of headers
+    used when designing the table for showing :class:`XMLItem` or
+    :class:`XMLGroup` values.
+
+    The output list consists on:
+    .. code-block:: python
+        return [[first header],
+         [Lemma],
+         [Part of speech],
+         [Morphology],
+         [Gloss]]
+
+    :param str first_header: the first header to put.
+    :param str tabletype: the table format - used only if LaTeX.
+
+    :return: a list containing the headers.
+    :rtype: list[str]
+    """
     endcol = '|' if "plain" in tabletype else ''
     return [f"{first_header}\t\t{endcol}",
             f"Lemma\t\t{endcol}",
@@ -289,13 +498,48 @@ def create_column_headers(first_header: str, tabletype: str) -> List[str]:
 
 @dataclass
 class Token(XMLItem):
+    """
+    The token represents a word. A word has only two mandatory attributes:
+     + The `id`.
+     + The `form`, it is, the word itself.
+
+    All other values are optional and can be omitted.
+    """
     id: str
+    """
+    The word unique ID.
+    """
+
     form: str
+    """
+    The word itself.
+    """
+
     alignment_id: Optional[List[str]] = None
+    """
+    Optional alignment ID, it is, the translated word(s) ID(s).
+    """
+
     lemma: Optional[str] = None
+    """
+    Word's lemma.
+    """
+
     part_of_speech: Optional[Value] = None
+    """
+    Optional part of speech corresponding that word.
+    """
+
     morphology: Optional[Morphology] = None
+    """
+    Optional morphology items defining that word.
+    """
+
     gloss: Optional[Value] = None
+    """
+    Optional glossary defined by that word.
+    """
+
     tag: str = field(default=None, init=False)
     item_tag: str = field(default='token', init=False, hash=hash('token'))
 
@@ -341,6 +585,19 @@ class Token(XMLItem):
         return token
 
     def describe(self, tabletype="simple") -> List[str]:
+        """
+        Generates a list with the description of the word. It consists on:
+         + Form.
+         + Lemma.
+         + Morphology fields.
+         + Part of speech.
+         + Glossary.
+
+        :param str tabletype: the output format for the table - only used if
+            LaTeX.
+        :return: the token representation.
+        :rtype: list[str]
+        """
         form = f"\\textbf{{{self.form}}}" if "latex" in tabletype else self.form
         lemma = f"\\textit{{{self.lemma}}}" \
             if "latex" in tabletype else self.lemma or ''
@@ -388,12 +645,28 @@ class Token(XMLItem):
 
 @dataclass
 class Sentence(XMLGroup[Token]):
+    """
+    Structure containing a set of tokens, which conforms a sentence.
+    """
+
     id: str = ""
+    """
+    Sentence unique ID.
+    """
+
     cls = Token
     item_tag: str = field(default='sentence', init=False, hash=hash('sentence'))
     subitem_tag: str = field(default='token', init=False, hash=hash('token'))
     status: AnnotationStatus = field(default=AnnotationStatus.UNANNOTATED)
+    """
+    Sentence annotation status - possible values defined at 
+    :class:`AnnotationStatus`.
+    """
+
     alignment_id: Optional[str] = None
+    """
+    Aligned sentence ID - represents a translation of this sentence.
+    """
 
     @classmethod
     def parse(cls,
@@ -434,6 +707,16 @@ class Sentence(XMLGroup[Token]):
 
     def find_by(self, data: Dict[AnnotationElements, Union[Set[str], str]]) -> \
             List[Token]:
+        """
+        Recursively looks for tokens that fulfill with the data requirements
+        specified.
+
+        :param data: a dictionary containing the annotation elements to filter
+            and the conditions of the filtering.
+        :type data: dict[AnnotationElements, set[str] or str]
+        :return: a list of tokens that fulfills the requirements.
+        :rtype: list[Token]
+        """
         found_tokens = defaultdict(set)
         keys = set()
         for token in self.fields:
@@ -470,6 +753,17 @@ class Sentence(XMLGroup[Token]):
     def side_by_side(self,
                      another: "Sentence",
                      tabletype="plain") -> str:
+        """
+        With the given sentence, compares all tokens contained in both
+        sentences (defined by their alignment ID) and generates a table
+        with the comparison.
+
+        :param Sentence another: the other sentence to compare.
+        :param str tabletype: the output table format.
+
+        :return: table representation of the comparison.
+        :rtype: str
+        """
         if self.alignment_id != another.id and another.alignment_id != self.id:
             raise ValueError("Sentences are not aligned!")
         if self.alignment_id == another.id:
@@ -530,20 +824,60 @@ class Sentence(XMLGroup[Token]):
 
 @dataclass
 class Source(XMLGroup[Sentence]):
+    """
+    The source conforms a set of sentences organized and translated into
+    another source.
+    """
+
     id: str = ''
+    """
+    Source unique ID.
+    """
+
     language: str = ''
+    """
+    Source's language.
+    """
+
     title: str = ''
+    """
+    Source's title.
+    """
+
     citation_part: str = ''
+    """
+    Source's citation.
+    """
+
     item_tag: str = field(default='source', init=False, hash=hash('source'))
     cls: T = Sentence
     subitem_tag: str = field(default='sentence',
                              init=False,
                              hash=hash('sentence'))
     alignment_id: Optional[str] = None
+    """
+    Source's translation's ID.
+    """
+
     editorial_note: Optional[str] = None
+    """
+    Source's editorial note.
+    """
+
     annotator: Optional[str] = None
+    """
+    Source's annotator.
+    """
+
     reviewer: Optional[str] = None
+    """
+    Source's reviewer.
+    """
+
     original_url: Optional[str] = None
+    """
+    Source's original URL.
+    """
 
     @classmethod
     def parse(cls,
@@ -611,6 +945,22 @@ class Source(XMLGroup[Sentence]):
                 sentences: Tuple[str, ...] = (),
                 status: Optional[AnnotationStatus] = None,
                 tabletype: str = "simple") -> str:
+        """
+        With the given source, compares each sentence defined at `sentences`
+        and generates a table with the sentences comparison.
+
+        :param Source another: the other source to compare with.
+        :param sentences: the sentences to compare. Empty means all.
+        :type sentences: tuple[str, ...]
+        :param AnnotationStatus status: the sentence status to use when
+            comparing. None means unused.
+        :param str tabletype: the output format for the table.
+
+        :return: sources comparison as a table.
+        :rtype: str
+
+        :raises ValueError: if the sources are not aligned.
+        """
         if self.alignment_id != another.id and another.alignment_id != self.id:
             raise ValueError("Sources are not aligned!")
         if self.alignment_id == another.id:
@@ -635,6 +985,15 @@ class Source(XMLGroup[Sentence]):
     def find_words_by(self,
                       data: Dict[AnnotationElements, Union[Set[str], str]]) -> \
             List[Token]:
+        """
+        With the given requirements, find all tokens that fulfills them.
+
+        :param data: a dictionary containing the annotation elements to filter
+            and the conditions of the filtering.
+        :type data: dict[AnnotationElements, set[str] or str]
+        :return: a list of tokens that fulfills the requirements.
+        :rtype: list[Token]
+        """
         results = []
         for field in self.fields:
             results.extend(field.find_by(data))
@@ -642,6 +1001,12 @@ class Source(XMLGroup[Sentence]):
 
 
 def main(args):
+    """
+    Main function that demonstrates how XMLCorpus works. Must receive a file
+    containing two souces with IDs 'text1' and 'text2', respectively.
+
+    :param args: command line arguments provided when this script is called.
+    """
     parser = etree.XMLParser(remove_comments=True)
     tree = etree.parse(args.file, parser=parser)
     annotation_element = None
