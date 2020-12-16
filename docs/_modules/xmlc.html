@@ -1,0 +1,1138 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>xmlc &#8212; XMLCorpus v1.0 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for xmlc</h1><div class="highlight"><pre>
+<span></span><span class="c1">#                             XMLCorpus</span>
+<span class="c1">#                  Copyright (C) 2020 - Javinator9889</span>
+<span class="c1">#</span>
+<span class="c1">#    This program is free software: you can redistribute it and/or modify</span>
+<span class="c1">#    it under the terms of the GNU General Public License as published by</span>
+<span class="c1">#      the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1">#                   (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1">#       This program is distributed in the hope that it will be useful,</span>
+<span class="c1">#       but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1">#        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1">#               GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1">#     You should have received a copy of the GNU General Public License</span>
+<span class="c1">#    along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="k">import</span> <span class="n">Enum</span>
+<span class="kn">from</span> <span class="nn">lxml</span> <span class="k">import</span> <span class="n">etree</span>
+<span class="kn">from</span> <span class="nn">warnings</span> <span class="k">import</span> <span class="n">warn</span>
+<span class="kn">from</span> <span class="nn">tabulate</span> <span class="k">import</span> <span class="n">tabulate</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="k">import</span> <span class="n">ArgumentParser</span>
+<span class="kn">from</span> <span class="nn">abc</span> <span class="k">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="k">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span> <span class="nn">pylatexenc.latexencode</span> <span class="k">import</span> <span class="n">UnicodeToLatexEncoder</span>
+
+<span class="c1"># type hints</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">Optional</span><span class="p">,</span>
+    <span class="n">Dict</span><span class="p">,</span>
+    <span class="n">List</span><span class="p">,</span>
+    <span class="n">Any</span><span class="p">,</span>
+    <span class="n">Union</span><span class="p">,</span>
+    <span class="n">TypeVar</span><span class="p">,</span>
+    <span class="n">Generic</span><span class="p">,</span>
+    <span class="n">Tuple</span><span class="p">,</span>
+    <span class="n">Set</span>
+<span class="p">)</span>
+
+<span class="n">encoder</span><span class="p">:</span> <span class="n">UnicodeToLatexEncoder</span> <span class="o">=</span> \
+    <span class="n">UnicodeToLatexEncoder</span><span class="p">(</span><span class="n">unknown_char_policy</span><span class="o">=</span><span class="s1">&#39;replace&#39;</span><span class="p">,</span>
+                          <span class="n">replacement_latex_protection</span><span class="o">=</span><span class="s2">&quot;braces&quot;</span><span class="p">,</span>
+                          <span class="n">non_ascii_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="XMLItem"><a class="viewcode-back" href="../index.html#xmlc.XMLItem">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">XMLItem</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base XML wrapper class. This item consists on a dataclass</span>
+<span class="sd">    with basically two fields:</span>
+<span class="sd">     + `tag`, containing the XML tag identifier.</span>
+<span class="sd">     + `item_tag`, containing the XML tag itself.</span>
+
+<span class="sd">    This abstract class defines two abstract methods that must be</span>
+<span class="sd">    override:</span>
+<span class="sd">     - :func:`parse`</span>
+<span class="sd">     - :func:`to_table`</span>
+
+<span class="sd">    Its main function is to simplify and contain basic XML data types.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tag</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The XML tag identifier, overriden by subclasses.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The XML tag itself, overriden by subclasses.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="XMLItem.parse"><a class="viewcode-back" href="../index.html#xmlc.XMLItem.parse">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span>
+              <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[XMLItem]&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        With the given :class:`lxml.etree.Element`, parses the :attr:`item_tag`</span>
+<span class="sd">        and creates a new :class:`XMLItem` with its data.</span>
+
+<span class="sd">        :param lxml.etree._Element element: the element to parse.</span>
+<span class="sd">        :param str tag: the XML tag itself.</span>
+<span class="sd">        :param kwargs: arbitrary arguments for custom parsing options.</span>
+<span class="sd">        :return: the new tag.</span>
+<span class="sd">        :rtype: XMLItem</span>
+<span class="sd">        :raises ValueError: if the `element.tag` is different than `tag`.</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+<div class="viewcode-block" id="XMLItem.to_table"><a class="viewcode-back" href="../index.html#xmlc.XMLItem.to_table">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Represents the :class:`XMLItem` by a table.</span>
+
+<span class="sd">        :param str tabletype: the table format to use. The following formats</span>
+<span class="sd">            are available:</span>
+<span class="sd">             + &quot;plain&quot;</span>
+<span class="sd">             + &quot;simple&quot;</span>
+<span class="sd">             + &quot;github&quot;</span>
+<span class="sd">             + &quot;grid&quot;</span>
+<span class="sd">             + &quot;fancy_grid&quot;</span>
+<span class="sd">             + &quot;pipe&quot;</span>
+<span class="sd">             + &quot;orgtbl&quot;</span>
+<span class="sd">             + &quot;jira&quot;</span>
+<span class="sd">             + &quot;presto&quot;</span>
+<span class="sd">             + &quot;pretty&quot;</span>
+<span class="sd">             + &quot;psql&quot;</span>
+<span class="sd">             + &quot;rst&quot;</span>
+<span class="sd">             + &quot;mediawiki&quot;</span>
+<span class="sd">             + &quot;moinmoin&quot;</span>
+<span class="sd">             + &quot;youtrack&quot;</span>
+<span class="sd">             + &quot;html&quot;</span>
+<span class="sd">             + &quot;latex&quot;</span>
+<span class="sd">             + &quot;latex_raw&quot;</span>
+<span class="sd">             + &quot;latex_booktabs&quot;</span>
+<span class="sd">             + &quot;textile&quot;</span>
+
+<span class="sd">        .. seealso::</span>
+<span class="sd">           Table formats are defined by :mod:`tabulate` - more information</span>
+<span class="sd">           about formatting at: https://pypi.org/project/tabulate/</span>
+
+<span class="sd">        :return: the table representation of the :class:`XMLItem`.</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">check_tag</span><span class="p">(</span><span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">tag</span> <span class="o">!=</span> <span class="n">tag</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Element </span><span class="si">{element.tag}</span><span class="s2">&#39;s tag must be &#39;</span><span class="si">{tag}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if another :class:`XMLItem` equals to us.</span>
+
+<span class="sd">        :param XMLItem other: the other item to check.</span>
+
+<span class="sd">        :return: `True` if items share :attr:`tag` and :attr:`item_tag`,</span>
+<span class="sd">            `False` otherwise.</span>
+<span class="sd">        :rtype: bool</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">tag</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">item_tag</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a unique representation of this object. Uses both :attr:`tag`</span>
+<span class="sd">        and :attr:`item_tag` for this purpose.</span>
+
+<span class="sd">        :return: the class hash.</span>
+<span class="sd">        :rtype: int</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_tag</span><span class="o">.</span><span class="n">hash</span><span class="p">))</span></div>
+
+
+<span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s1">&#39;T&#39;</span><span class="p">)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Generic type for designating groups of XML tags.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="XMLGroup"><a class="viewcode-back" href="../index.html#xmlc.XMLGroup">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">XMLGroup</span><span class="p">(</span><span class="n">XMLItem</span><span class="p">,</span> <span class="n">Generic</span><span class="p">[</span><span class="n">T</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Specialization of :class:`XMLItem` for containing a variable set</span>
+<span class="sd">    of fields of type :data:`T`.</span>
+
+<span class="sd">    Those fields can be accessed in three ways:</span>
+<span class="sd">     + By providing the index using :attr:`fields`.</span>
+<span class="sd">     + By providing the field tag by using :attr:`dirs` and :attr:`fields`.</span>
+<span class="sd">     + By direct access using both index or tag.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="bp">cls</span><span class="p">:</span> <span class="n">T</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The generic class used when parsing found subclasses.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">subitem_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The containing :data:`T` tag.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">fields</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">T</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    List of arbitrary length containing the :data:`T` objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dirs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Map containing the :data:`T` identifiers and its position in :attr:`fields`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="XMLGroup.parse"><a class="viewcode-back" href="../index.html#xmlc.XMLGroup.parse">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span>
+              <span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span>
+              <span class="n">subcls</span><span class="p">:</span> <span class="n">T</span><span class="p">,</span>
+              <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[XMLGroup]&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        With the given :class:`lxml.etree.Element`, parses the :attr:`item_tag`</span>
+<span class="sd">        and creates a new :class:`XMLGroup` with its data. In addition to</span>
+<span class="sd">        :class:`XMLItem`, finds and parses any subitem contained by the tag.</span>
+
+<span class="sd">        :param lxml.etree._Element element: the element to parse.</span>
+<span class="sd">        :param T subcls: the subclass type used when parsing found objects.</span>
+<span class="sd">        :param str tag: the XML tag itself.</span>
+<span class="sd">        :param kwargs: arbitrary arguments for custom parsing options.</span>
+<span class="sd">        :return: the new group of tags.</span>
+<span class="sd">        :rtype: XMLItem</span>
+<span class="sd">        :raises ValueError: if the `element.tag` is different than `tag`.</span>
+<span class="sd">        :raises AttributeError: if `subcls` is not a subclass of</span>
+<span class="sd">            :class:`XMLItem` or :class:`XMLGroup`.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">subcls</span><span class="p">,</span> <span class="n">XMLItem</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">subcls</span><span class="p">,</span> <span class="n">XMLGroup</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Class </span><span class="si">{subcls}</span><span class="s2"> must inherit from XMLItem or &quot;</span>
+                                 <span class="n">f</span><span class="s2">&quot;XMLGroup&quot;</span><span class="p">)</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">dirs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">element</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">subcls</span><span class="p">,</span> <span class="n">XMLGroup</span><span class="p">):</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">subcls</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">element</span><span class="o">=</span><span class="n">field</span><span class="p">,</span>
+                                     <span class="n">subcls</span><span class="o">=</span><span class="n">subcls</span><span class="o">.</span><span class="n">cls</span><span class="p">,</span>
+                                     <span class="n">tag</span><span class="o">=</span><span class="n">tag</span> <span class="ow">or</span> <span class="n">subcls</span><span class="o">.</span><span class="n">subitem_tag</span><span class="p">,</span>
+                                     <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">subcls</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">element</span><span class="o">=</span><span class="n">field</span><span class="p">,</span>
+                                     <span class="n">tag</span><span class="o">=</span><span class="n">tag</span> <span class="ow">or</span> <span class="n">subcls</span><span class="o">.</span><span class="n">item_tag</span><span class="p">,</span>
+                                     <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">fields</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                <span class="n">dirs</span><span class="p">[</span><span class="n">value</span><span class="o">.</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="n">idx</span>
+                <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tag&#39;</span><span class="p">),</span> <span class="n">element</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">dirs</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">XMLGroup</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
+               <span class="bp">self</span><span class="o">.</span><span class="n">subitem_tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">subitem_tag</span>
+
+<div class="viewcode-block" id="XMLGroup.to_table"><a class="viewcode-back" href="../index.html#xmlc.XMLGroup.to_table">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">dirs</span><span class="p">[</span><span class="n">item</span><span class="p">]]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> \
+            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">subitem_tag</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Value"><a class="viewcode-back" href="../index.html#xmlc.Value">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Value</span><span class="p">(</span><span class="n">XMLItem</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The simplest XML item available, containing both a :attr:`tag` and a</span>
+<span class="sd">    :attr:`summary`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :class:`Value` identifier tag.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">summary</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :class:`Value` summary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Value.parse"><a class="viewcode-back" href="../index.html#xmlc.Value.parse">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;value&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Value&quot;</span><span class="p">:</span>
+        <span class="n">XMLItem</span><span class="o">.</span><span class="n">check_tag</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Value</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tag&#39;</span><span class="p">),</span> <span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;summary&#39;</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="Value.to_table"><a class="viewcode-back" href="../index.html#xmlc.Value.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">tabulate</span><span class="p">([(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">summary</span><span class="p">)],</span>
+                         <span class="n">headers</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Tag&#39;</span><span class="p">,</span> <span class="s1">&#39;Summary&#39;</span><span class="p">),</span>
+                         <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span><span class="n">table</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">table</span></div>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">Value</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
+               <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">tag</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">summary</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">summary</span></div>
+
+
+<div class="viewcode-block" id="Field"><a class="viewcode-back" href="../index.html#xmlc.Field">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Field</span><span class="p">(</span><span class="n">XMLGroup</span><span class="p">[</span><span class="n">Value</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class grouping a set of :class:`Value`s.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">cls</span><span class="p">:</span> <span class="n">T</span> <span class="o">=</span> <span class="n">Value</span>
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;field&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;field&#39;</span><span class="p">))</span>
+    <span class="n">subitem_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;value&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Field.to_table"><a class="viewcode-back" href="../index.html#xmlc.Field.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">table_contents</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">table_contents</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">value</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">summary</span><span class="p">))</span>
+        <span class="n">tmp_table</span> <span class="o">=</span> <span class="n">tabulate</span><span class="p">(</span><span class="n">table_contents</span><span class="p">,</span>
+                             <span class="n">headers</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Tag&#39;</span><span class="p">,</span> <span class="s1">&#39;Summary&#39;</span><span class="p">),</span>
+                             <span class="n">tablefmt</span><span class="o">=</span><span class="s2">&quot;plain&quot;</span><span class="p">)</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="p">[(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">tmp_table</span><span class="p">)]</span>
+        <span class="n">tab</span> <span class="o">=</span> <span class="n">tabulate</span><span class="p">(</span><span class="n">table</span><span class="p">,</span>
+                       <span class="n">headers</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Field tag&#39;</span><span class="p">,</span> <span class="s1">&#39;Values&#39;</span><span class="p">),</span>
+                       <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">,</span>
+                       <span class="n">colalign</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;center&quot;</span><span class="p">,))</span>
+        <span class="k">return</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span><span class="n">tab</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">tab</span></div>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">dirs</span><span class="p">[</span><span class="n">item</span><span class="p">]]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> \
+            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_table</span><span class="p">(</span><span class="s2">&quot;fancy_grid&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Morphology"><a class="viewcode-back" href="../index.html#xmlc.Morphology">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Morphology</span><span class="p">(</span><span class="n">XMLGroup</span><span class="p">[</span><span class="n">Field</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The morphology contains a group of fields containing values. This</span>
+<span class="sd">    describes how the text&#39;s tokens are.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="bp">cls</span><span class="p">:</span> <span class="n">T</span> <span class="o">=</span> <span class="n">Field</span>
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;morphology&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;morph&#39;</span><span class="p">))</span>
+    <span class="n">subitem_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;field&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;field&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Morphology.to_table"><a class="viewcode-back" href="../index.html#xmlc.Morphology.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ignored</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Morphology.get"><a class="viewcode-back" href="../index.html#xmlc.Morphology.get">[docs]</a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">default_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> \
+            <span class="n">Union</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Searchs for an item, given its position or its tag. If not found,</span>
+<span class="sd">        returns the default value.</span>
+
+<span class="sd">        :param item: the item to look for. Can be the index</span>
+<span class="sd">            or the identifier tag.</span>
+<span class="sd">        :type item: str or int</span>
+<span class="sd">        :param Any default_value: the value to return when not found.</span>
+
+<span class="sd">        :return: the found :class:`Field` or the default value.</span>
+<span class="sd">        :rtype: Field or Any</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">item</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> \
+                <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">dirs</span><span class="p">[</span><span class="n">item</span><span class="p">]]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default_value</span></div>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Morphology&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">res</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Annotation"><a class="viewcode-back" href="../index.html#xmlc.Annotation">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Annotation</span><span class="p">(</span><span class="n">XMLItem</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Master class containing all possible annotations that can exist in a XML</span>
+<span class="sd">    file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">morphology</span><span class="p">:</span> <span class="n">Morphology</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The annotation&#39;s morphology.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">parts_of_speech</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The annotation&#39;s part of speech - can be `None`.</span>
+<span class="sd">    </span>
+<span class="sd">    :type: Field or None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">gloss</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The annotation&#39;s glossary - can be `None`.</span>
+<span class="sd">    </span>
+<span class="sd">    :type: Field or None</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_table</span><span class="p">(</span><span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;fancy_grid&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Annotation.parse"><a class="viewcode-back" href="../index.html#xmlc.Annotation.parse">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">annotation</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span>
+              <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;annotation&#39;</span><span class="p">,</span>
+              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Annotation&quot;</span><span class="p">:</span>
+        <span class="n">XMLItem</span><span class="o">.</span><span class="n">check_tag</span><span class="p">(</span><span class="n">annotation</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+        <span class="n">morphology</span> <span class="o">=</span> <span class="n">Morphology</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">element</span><span class="o">=</span><span class="n">annotation</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;morphology&#39;</span><span class="p">),</span>
+                                      <span class="n">subcls</span><span class="o">=</span><span class="n">Morphology</span><span class="o">.</span><span class="n">cls</span><span class="p">)</span>
+
+        <span class="n">pos</span> <span class="o">=</span> <span class="n">annotation</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;parts-of-speech&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pos</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">parts_of_speech</span> <span class="o">=</span> <span class="n">Field</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">subcls</span><span class="o">=</span><span class="n">Value</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">gls</span> <span class="o">=</span> <span class="n">annotation</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;gloss&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">gls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">gloss</span> <span class="o">=</span> <span class="n">Field</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">gls</span><span class="p">,</span> <span class="n">subcls</span><span class="o">=</span><span class="n">Value</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Annotation</span><span class="p">(</span><span class="n">annotation</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tag&#39;</span><span class="p">),</span>
+                          <span class="n">annotation</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span>
+                          <span class="n">morphology</span><span class="p">,</span>
+                          <span class="n">parts_of_speech</span><span class="p">,</span>
+                          <span class="n">gloss</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Annotation.to_table"><a class="viewcode-back" href="../index.html#xmlc.Annotation.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">morphology</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parts_of_speech</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Parts of speech&#39;</span><span class="p">)</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">parts_of_speech</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+                <span class="n">pos</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">value</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">summary</span><span class="p">))</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tabulate</span><span class="p">(</span><span class="n">pos</span><span class="p">,</span>
+                                <span class="n">headers</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Tag&#39;</span><span class="p">,</span> <span class="s1">&#39;Summary&#39;</span><span class="p">),</span>
+                                <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">,</span>
+                                <span class="n">colalign</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="s2">&quot;center&quot;</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gloss</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;Gloss&#39;</span><span class="p">)</span>
+            <span class="n">gls</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">gloss</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+                <span class="n">gls</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">value</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">value</span><span class="o">.</span><span class="n">summary</span><span class="p">))</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tabulate</span><span class="p">(</span><span class="n">gls</span><span class="p">,</span>
+                                <span class="n">headers</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;Tag&#39;</span><span class="p">,</span> <span class="s1">&#39;Summary&#39;</span><span class="p">),</span>
+                                <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">,</span>
+                                <span class="n">colalign</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;center&quot;</span><span class="p">,</span> <span class="s2">&quot;center&quot;</span><span class="p">)))</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span><span class="n">table</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">table</span></div>
+
+    <span class="k">def</span> <span class="nf">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">morphology</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">parts_of_speech</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">gloss</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="AnnotationStatus"><a class="viewcode-back" href="../index.html#xmlc.AnnotationStatus">[docs]</a><span class="k">class</span> <span class="nc">AnnotationStatus</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enumeration containing the three possible statuses for a sentence:</span>
+<span class="sd">     1. Annotated</span>
+<span class="sd">     2. Unannotated</span>
+<span class="sd">     3. Reviewed</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ANNOTATED</span> <span class="o">=</span> <span class="s2">&quot;annotated&quot;</span>
+    <span class="n">UNANNOTATED</span> <span class="o">=</span> <span class="s2">&quot;unannotated&quot;</span>
+    <span class="n">REVIEWED</span> <span class="o">=</span> <span class="s2">&quot;reviewed&quot;</span></div>
+
+
+<div class="viewcode-block" id="AnnotationElements"><a class="viewcode-back" href="../index.html#xmlc.AnnotationElements">[docs]</a><span class="k">class</span> <span class="nc">AnnotationElements</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Enumeration containing the possible parts that conforms an annotation.</span>
+<span class="sd">    Can be:</span>
+<span class="sd">     1. Morphology</span>
+<span class="sd">     2. Parts of speech</span>
+<span class="sd">     3. Gloss</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Morphology</span> <span class="o">=</span> <span class="s2">&quot;morphology&quot;</span>
+    <span class="n">PartsOfSpeech</span> <span class="o">=</span> <span class="s2">&quot;part_of_speech&quot;</span>
+    <span class="n">Gloss</span> <span class="o">=</span> <span class="s2">&quot;gloss&quot;</span></div>
+
+
+<div class="viewcode-block" id="create_column_headers"><a class="viewcode-back" href="../index.html#xmlc.create_column_headers">[docs]</a><span class="k">def</span> <span class="nf">create_column_headers</span><span class="p">(</span><span class="n">first_header</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">tabletype</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    With the given first header and the table type, creates a list of headers</span>
+<span class="sd">    used when designing the table for showing :class:`XMLItem` or</span>
+<span class="sd">    :class:`XMLGroup` values.</span>
+
+<span class="sd">    The output list consists on:</span>
+<span class="sd">    .. code-block:: python</span>
+<span class="sd">        return [[first header],</span>
+<span class="sd">         [Lemma],</span>
+<span class="sd">         [Part of speech],</span>
+<span class="sd">         [Morphology],</span>
+<span class="sd">         [Gloss]]</span>
+
+<span class="sd">    :param str first_header: the first header to put.</span>
+<span class="sd">    :param str tabletype: the table format - used only if LaTeX.</span>
+
+<span class="sd">    :return: a list containing the headers.</span>
+<span class="sd">    :rtype: list[str]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">endcol</span> <span class="o">=</span> <span class="s1">&#39;|&#39;</span> <span class="k">if</span> <span class="s2">&quot;plain&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{first_header}</span><span class="se">\t\t</span><span class="si">{endcol}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">f</span><span class="s2">&quot;Lemma</span><span class="se">\t\t</span><span class="si">{endcol}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">f</span><span class="s2">&quot;Part of speech</span><span class="se">\t</span><span class="si">{endcol}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">f</span><span class="s2">&quot;Morphology</span><span class="se">\t</span><span class="si">{endcol}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">f</span><span class="s2">&quot;Gloss</span><span class="se">\t\t</span><span class="si">{endcol}</span><span class="s2">&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Token"><a class="viewcode-back" href="../index.html#xmlc.Token">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Token</span><span class="p">(</span><span class="n">XMLItem</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The token represents a word. A word has only two mandatory attributes:</span>
+<span class="sd">     + The `id`.</span>
+<span class="sd">     + The `form`, it is, the word itself.</span>
+
+<span class="sd">    All other values are optional and can be omitted.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The word unique ID.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">form</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The word itself.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">alignment_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Optional alignment ID, it is, the translated word(s) ID(s).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">lemma</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Word&#39;s lemma.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">part_of_speech</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Value</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Optional part of speech corresponding that word.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">morphology</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Morphology</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Optional morphology items defining that word.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">gloss</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Value</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Optional glossary defined by that word.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;token&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;token&#39;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Token.parse"><a class="viewcode-back" href="../index.html#xmlc.Token.parse">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span>
+              <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;token&#39;</span><span class="p">,</span>
+              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;XMLItem&quot;</span><span class="p">:</span>
+        <span class="n">XMLItem</span><span class="o">.</span><span class="n">check_tag</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+        <span class="n">token</span> <span class="o">=</span> <span class="n">Token</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">),</span> <span class="n">form</span><span class="o">=</span><span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;form&#39;</span><span class="p">))</span>
+        <span class="n">annotation</span><span class="p">:</span> <span class="n">Annotation</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;annotation&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">attr_value</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="k">if</span> <span class="n">attr</span> <span class="o">==</span> <span class="s1">&#39;morphology&#39;</span><span class="p">:</span>
+                <span class="n">fields</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">dirs</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">value</span><span class="p">)),</span> <span class="n">value</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">field</span> <span class="o">!=</span> <span class="s1">&#39;-&#39;</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">fields</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">annotation</span><span class="o">.</span><span class="n">morphology</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">field</span><span class="p">])</span>
+                            <span class="n">dirs</span><span class="p">[</span><span class="n">annotation</span><span class="o">.</span><span class="n">morphology</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="n">idx</span>
+                            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">annotation</span><span class="o">.</span><span class="n">morphology</span><span class="o">.</span><span class="n">fields</span><span class="p">):</span>
+                                <span class="n">warn</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;More morphologies </span><span class="si">{i}</span><span class="s2"> than previously&quot;</span>
+                                     <span class="n">f</span><span class="s2">&quot;declared (were &quot;</span>
+                                     <span class="n">f</span><span class="s2">&quot;{len(annotation.morphology.fields)})&quot;</span><span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="n">warn</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Morphology with tag &#39;</span><span class="si">{field}</span><span class="s2">&#39; not &quot;</span>
+                                     <span class="n">f</span><span class="s2">&quot;found in field &quot;</span>
+                                     <span class="n">f</span><span class="s2">&quot;&#39;</span><span class="si">{annotation.morphology[i].tag}</span><span class="s2">&#39; (&quot;</span>
+                                     <span class="n">f</span><span class="s2">&quot;token with ID: &#39;</span><span class="si">{token.id}</span><span class="s2">&#39;)&quot;</span><span class="p">)</span>
+                <span class="n">attr_value</span> <span class="o">=</span> <span class="n">Morphology</span><span class="p">(</span><span class="n">tag</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="n">fields</span><span class="p">,</span> <span class="n">dirs</span><span class="o">=</span><span class="n">dirs</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">attr</span> <span class="o">==</span> <span class="s1">&#39;part-of-speech&#39;</span><span class="p">:</span>
+                <span class="n">attr_value</span> <span class="o">=</span> <span class="n">annotation</span><span class="o">.</span><span class="n">parts_of_speech</span><span class="p">[</span><span class="n">value</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">attr</span> <span class="o">==</span> <span class="s1">&#39;gloss&#39;</span><span class="p">:</span>
+                <span class="n">attr_value</span> <span class="o">=</span> <span class="n">annotation</span><span class="o">.</span><span class="n">gloss</span><span class="p">[</span><span class="n">value</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">attr</span> <span class="o">==</span> <span class="s1">&#39;alignment-id&#39;</span><span class="p">:</span>
+                <span class="n">attr_value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+            <span class="n">attr</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="s1">&#39;_&#39;</span><span class="p">)</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">attr_value</span><span class="p">)</span>
+        <span class="n">token</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">id</span>
+        <span class="k">return</span> <span class="n">token</span></div>
+
+<div class="viewcode-block" id="Token.describe"><a class="viewcode-back" href="../index.html#xmlc.Token.describe">[docs]</a>    <span class="k">def</span> <span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a list with the description of the word. It consists on:</span>
+<span class="sd">         + Form.</span>
+<span class="sd">         + Lemma.</span>
+<span class="sd">         + Morphology fields.</span>
+<span class="sd">         + Part of speech.</span>
+<span class="sd">         + Glossary.</span>
+
+<span class="sd">        :param str tabletype: the output format for the table - only used if</span>
+<span class="sd">            LaTeX.</span>
+<span class="sd">        :return: the token representation.</span>
+<span class="sd">        :rtype: list[str]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">form</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">textbf{{</span><span class="si">{self.form}</span><span class="s2">}}&quot;</span> <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">form</span>
+        <span class="n">lemma</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">textit{{</span><span class="si">{self.lemma}</span><span class="s2">}}&quot;</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">lemma</span> <span class="ow">or</span> <span class="s1">&#39;&#39;</span>
+        <span class="n">token_desc</span> <span class="o">=</span> <span class="p">[</span><span class="n">form</span><span class="p">,</span> <span class="n">lemma</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">part_of_speech</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">token_desc</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">part_of_speech</span><span class="o">.</span><span class="n">summary</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">token_desc</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">morphology</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">desc_morph</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">morphology</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+                <span class="n">desc_morph</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">summary</span><span class="p">)</span>
+            <span class="n">token_desc</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">desc_morph</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">token_desc</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gloss</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">token_desc</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">gloss</span><span class="o">.</span><span class="n">summary</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">token_desc</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">token_desc</span><span class="p">)):</span>
+                <span class="n">token_desc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;{{</span><span class="se">\\</span><span class="s2">small </span><span class="si">{token_desc[i]}</span><span class="s2">}}&quot;</span>
+        <span class="k">return</span> <span class="n">token_desc</span></div>
+
+<div class="viewcode-block" id="Token.to_table"><a class="viewcode-back" href="../index.html#xmlc.Token.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">,</span> <span class="n">add_headers</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="n">create_column_headers</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Word (</span><span class="si">{self.id}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">tabletype</span><span class="p">)</span>
+        <span class="n">table_output</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">]</span> <span class="k">if</span> <span class="n">add_headers</span> <span class="k">else</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">headers</span><span class="p">]</span>
+        <span class="n">token_desc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">tabletype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">desc</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">token_desc</span><span class="p">)),</span> <span class="n">token_desc</span><span class="p">):</span>
+            <span class="n">table_output</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">desc</span><span class="p">)</span>
+
+        <span class="n">align</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;center&quot;</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">table_output</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">tabulate</span><span class="p">(</span><span class="n">table_output</span><span class="p">,</span> <span class="n">colalign</span><span class="o">=</span><span class="n">align</span><span class="p">,</span> <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span><span class="n">table</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">table</span></div>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">tag</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_tag</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">item_tag</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">item_tag</span><span class="p">)))</span></div>
+
+
+<div class="viewcode-block" id="Sentence"><a class="viewcode-back" href="../index.html#xmlc.Sentence">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Sentence</span><span class="p">(</span><span class="n">XMLGroup</span><span class="p">[</span><span class="n">Token</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Structure containing a set of tokens, which conforms a sentence.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sentence unique ID.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="bp">cls</span> <span class="o">=</span> <span class="n">Token</span>
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;sentence&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;sentence&#39;</span><span class="p">))</span>
+    <span class="n">subitem_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;token&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;token&#39;</span><span class="p">))</span>
+    <span class="n">status</span><span class="p">:</span> <span class="n">AnnotationStatus</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">AnnotationStatus</span><span class="o">.</span><span class="n">UNANNOTATED</span><span class="p">)</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sentence annotation status - possible values defined at </span>
+<span class="sd">    :class:`AnnotationStatus`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">alignment_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Aligned sentence ID - represents a translation of this sentence.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Sentence.parse"><a class="viewcode-back" href="../index.html#xmlc.Sentence.parse">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span>
+              <span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span>
+              <span class="n">subcls</span><span class="p">:</span> <span class="n">T</span><span class="p">,</span>
+              <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Sentence]&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">tag</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;ignored_tags&#39;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">sentence</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Sentence</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">element</span><span class="p">,</span>
+                                              <span class="n">subcls</span><span class="p">,</span>
+                                              <span class="n">tag</span><span class="p">,</span>
+                                              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">sentence</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">)</span>
+        <span class="n">sentence</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="n">AnnotationStatus</span><span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;status&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()]</span>
+        <span class="n">sentence</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;alignment-id&#39;</span><span class="p">)</span>
+        <span class="n">sentence</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">sentence</span><span class="o">.</span><span class="n">id</span>
+
+        <span class="k">return</span> <span class="n">sentence</span></div>
+
+<div class="viewcode-block" id="Sentence.to_table"><a class="viewcode-back" href="../index.html#xmlc.Sentence.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;plain&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">sentence_id_fmt</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">texttt{{</span><span class="si">{self.id}</span><span class="s2">}}&quot;</span> <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">table_output</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">]</span> <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">create_column_headers</span><span class="p">(</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="si">{sentence_id_fmt}</span><span class="s2"> (</span><span class="si">{self.status.value}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">tabletype</span>
+        <span class="p">)]</span>
+        <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">token</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">desc</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">desc</span><span class="p">)),</span> <span class="n">desc</span><span class="p">):</span>
+                <span class="n">table_output</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">align</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;center&quot;</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">table_output</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">tabulate</span><span class="p">(</span><span class="n">table_output</span><span class="p">,</span> <span class="n">colalign</span><span class="o">=</span><span class="n">align</span><span class="p">,</span> <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span><span class="n">table</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">table</span></div>
+
+<div class="viewcode-block" id="Sentence.find_by"><a class="viewcode-back" href="../index.html#xmlc.Sentence.find_by">[docs]</a>    <span class="k">def</span> <span class="nf">find_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">AnnotationElements</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> \
+            <span class="n">List</span><span class="p">[</span><span class="n">Token</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recursively looks for tokens that fulfill with the data requirements</span>
+<span class="sd">        specified.</span>
+
+<span class="sd">        :param data: a dictionary containing the annotation elements to filter</span>
+<span class="sd">            and the conditions of the filtering.</span>
+<span class="sd">        :type data: dict[AnnotationElements, set[str] or str]</span>
+<span class="sd">        :return: a list of tokens that fulfills the requirements.</span>
+<span class="sd">        :rtype: list[Token]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">found_tokens</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">element</span><span class="p">,</span> <span class="n">topology</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">keys</span> <span class="o">|=</span> <span class="n">topology</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">topology</span><span class="p">,</span> <span class="nb">set</span><span class="p">)</span> <span class="k">else</span> <span class="p">{</span><span class="n">topology</span><span class="p">}</span>
+                <span class="n">attr</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">attr</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">attr</span><span class="p">,</span> <span class="n">Morphology</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">topology</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                            <span class="n">field</span><span class="p">,</span> <span class="n">tag</span> <span class="o">=</span> <span class="n">topology</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">attr</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="ow">and</span> <span class="n">attr</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">tag</span><span class="p">:</span>
+                                <span class="n">found_tokens</span><span class="p">[</span><span class="n">topology</span><span class="p">]</span> <span class="o">|=</span> <span class="p">{</span><span class="n">token</span><span class="p">}</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="n">topo</span> <span class="ow">in</span> <span class="n">topology</span><span class="p">:</span>
+                                <span class="n">field</span><span class="p">,</span> <span class="n">tag</span> <span class="o">=</span> <span class="n">topo</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+                                <span class="k">if</span> <span class="n">attr</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="ow">and</span> <span class="n">attr</span><span class="p">[</span><span class="n">field</span><span class="p">]</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">tag</span><span class="p">:</span>
+                                    <span class="n">found_tokens</span><span class="p">[</span><span class="n">topo</span><span class="p">]</span> <span class="o">|=</span> <span class="p">{</span><span class="n">token</span><span class="p">}</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">topology</span><span class="p">,</span> <span class="nb">set</span><span class="p">):</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                <span class="s2">&quot;Data can be a set only when matching&quot;</span>
+                                <span class="s2">&quot;morphology&quot;</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">tag</span> <span class="o">==</span> <span class="n">topology</span><span class="p">:</span>
+                            <span class="n">found_tokens</span><span class="p">[</span><span class="n">topology</span><span class="p">]</span> <span class="o">|=</span> <span class="p">{</span><span class="n">token</span><span class="p">}</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">keys</span><span class="p">)),</span> <span class="n">keys</span><span class="p">):</span>
+            <span class="n">token</span> <span class="o">=</span> <span class="n">found_tokens</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">tokens</span> <span class="o">=</span> <span class="n">token</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">tokens</span> <span class="o">&amp;=</span> <span class="n">token</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">tokens</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Sentence.side_by_side"><a class="viewcode-back" href="../index.html#xmlc.Sentence.side_by_side">[docs]</a>    <span class="k">def</span> <span class="nf">side_by_side</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                     <span class="n">another</span><span class="p">:</span> <span class="s2">&quot;Sentence&quot;</span><span class="p">,</span>
+                     <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;plain&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        With the given sentence, compares all tokens contained in both</span>
+<span class="sd">        sentences (defined by their alignment ID) and generates a table</span>
+<span class="sd">        with the comparison.</span>
+
+<span class="sd">        :param Sentence another: the other sentence to compare.</span>
+<span class="sd">        :param str tabletype: the output table format.</span>
+
+<span class="sd">        :return: table representation of the comparison.</span>
+<span class="sd">        :rtype: str</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">!=</span> <span class="n">another</span><span class="o">.</span><span class="n">id</span> <span class="ow">and</span> <span class="n">another</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Sentences are not aligned!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">==</span> <span class="n">another</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span>
+            <span class="n">other</span> <span class="o">=</span> <span class="n">another</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">another</span>
+            <span class="n">other</span> <span class="o">=</span> <span class="bp">self</span>
+
+        <span class="n">sentence1_id_fmt</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">texttt{{</span><span class="si">{source.id}</span><span class="s2">}}&quot;</span> <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">source</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">sentence2_id_fmt</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">texttt{{</span><span class="si">{other.id}</span><span class="s2">}}&quot;</span> <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> \
+            <span class="k">else</span> <span class="n">other</span><span class="o">.</span><span class="n">id</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="n">create_column_headers</span><span class="p">(</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="si">{sentence1_id_fmt}</span><span class="s2"> (</span><span class="si">{source.status.value}</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">tabletype</span>
+        <span class="p">)</span>
+        <span class="n">headers</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">create_column_headers</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{sentence2_id_fmt}</span><span class="s2"> (&quot;</span>
+                                             <span class="n">f</span><span class="s2">&quot;</span><span class="si">{other.status.value}</span><span class="s2">)&quot;</span><span class="p">,</span>
+                                             <span class="n">tabletype</span><span class="p">))</span>
+        <span class="n">table_output</span> <span class="o">=</span> <span class="p">[[</span><span class="n">header</span><span class="p">]</span> <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">headers</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">token</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">desc1</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">tabletype</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">desc1</span><span class="p">)),</span> <span class="n">desc1</span><span class="p">):</span>
+                <span class="n">table_output</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+            <span class="n">aligned_tokens</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">aligned_token_ids</span> <span class="o">=</span> <span class="n">token</span><span class="o">.</span><span class="n">alignment_id</span> <span class="ow">or</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">token_id</span> <span class="ow">in</span> <span class="n">aligned_token_ids</span><span class="p">:</span>
+                <span class="n">other_token</span> <span class="o">=</span> <span class="n">other</span><span class="p">[</span><span class="n">token_id</span><span class="p">]</span>
+                <span class="n">desc2</span> <span class="o">=</span> <span class="n">other_token</span><span class="o">.</span><span class="n">describe</span><span class="p">(</span><span class="n">tabletype</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">aligned_tokens</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">aligned_tokens</span> <span class="o">=</span> <span class="n">desc2</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">desc2</span><span class="p">)),</span> <span class="n">desc2</span><span class="p">):</span>
+                        <span class="n">aligned_tokens</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;</span><span class="si">{aligned_tokens[i]}</span><span class="s2"> - </span><span class="si">{data}</span><span class="s2">&quot;</span>
+
+            <span class="k">if</span> <span class="n">aligned_tokens</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">aligned_tokens</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">desc1</span><span class="p">)</span>
+
+            <span class="n">start</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">desc1</span><span class="p">)</span>
+            <span class="n">stop</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">aligned_tokens</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">),</span> <span class="n">aligned_tokens</span><span class="p">):</span>
+                <span class="n">table_output</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">align</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;center&quot;</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">table_output</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">tabulate</span><span class="p">(</span><span class="n">table_output</span><span class="p">,</span> <span class="n">colalign</span><span class="o">=</span><span class="n">align</span><span class="p">,</span> <span class="n">tablefmt</span><span class="o">=</span><span class="n">tabletype</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span><span class="p">:</span>
+            <span class="n">table</span> <span class="o">=</span> <span class="n">table</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{tabular}</span><span class="s2">{c&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">{tabular}</span><span class="s2">{c|&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> \
+                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="se">\\\\\n</span><span class="s2"> </span><span class="se">\\</span><span class="s2">texttt{{</span><span class="si">{other.id}</span><span class="s2">}}&quot;</span><span class="p">,</span>
+                         <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\\\</span><span class="s2">[1ex]</span><span class="se">\n\\</span><span class="s2">hline</span><span class="se">\n</span><span class="s2"> </span><span class="se">\\</span><span class="s2">texttt{{</span><span class="si">{other.id}</span><span class="s2">}}&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">table</span></div>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">id</span></div>
+
+
+<div class="viewcode-block" id="Source"><a class="viewcode-back" href="../index.html#xmlc.Source">[docs]</a><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Source</span><span class="p">(</span><span class="n">XMLGroup</span><span class="p">[</span><span class="n">Sentence</span><span class="p">]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The source conforms a set of sentences organized and translated into</span>
+<span class="sd">    another source.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source unique ID.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s language.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s title.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">citation_part</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s citation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">item_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;source&#39;</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;source&#39;</span><span class="p">))</span>
+    <span class="bp">cls</span><span class="p">:</span> <span class="n">T</span> <span class="o">=</span> <span class="n">Sentence</span>
+    <span class="n">subitem_tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s1">&#39;sentence&#39;</span><span class="p">,</span>
+                             <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                             <span class="nb">hash</span><span class="o">=</span><span class="nb">hash</span><span class="p">(</span><span class="s1">&#39;sentence&#39;</span><span class="p">))</span>
+    <span class="n">alignment_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s translation&#39;s ID.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">editorial_note</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s editorial note.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">annotator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s annotator.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">reviewer</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s reviewer.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">original_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Source&#39;s original URL.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Source.parse"><a class="viewcode-back" href="../index.html#xmlc.Source.parse">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span>
+              <span class="n">element</span><span class="p">:</span> <span class="n">etree</span><span class="o">.</span><span class="n">_Element</span><span class="p">,</span>
+              <span class="n">subcls</span><span class="p">:</span> <span class="n">T</span><span class="p">,</span>
+              <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+              <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Source]&quot;</span><span class="p">:</span>
+        <span class="n">sid</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">)</span>
+        <span class="n">language</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;language&#39;</span><span class="p">)</span>
+        <span class="n">alignment_id</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;alignment-id&#39;</span><span class="p">)</span>
+        <span class="n">title</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;title&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">citation_part</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;citation-part&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">editorial_note</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;editorial-note&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">annotator</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;annotator&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">reviewer</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;reviewer&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">original_url</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;electronic-text-original-url&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Source</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;div&#39;</span><span class="p">),</span>
+                                          <span class="n">subcls</span><span class="p">,</span>
+                                          <span class="n">tag</span><span class="p">,</span>
+                                          <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">sid</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">language</span> <span class="o">=</span> <span class="n">language</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">=</span> <span class="n">alignment_id</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">citation_part</span> <span class="o">=</span> <span class="n">citation_part</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">editorial_note</span> <span class="o">=</span> <span class="n">editorial_note</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">annotator</span> <span class="o">=</span> <span class="n">annotator</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">reviewer</span> <span class="o">=</span> <span class="n">reviewer</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">original_url</span> <span class="o">=</span> <span class="n">original_url</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">sid</span>
+
+        <span class="k">return</span> <span class="n">source</span></div>
+
+<div class="viewcode-block" id="Source.to_table"><a class="viewcode-back" href="../index.html#xmlc.Source.to_table">[docs]</a>    <span class="k">def</span> <span class="nf">to_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="n">encoder</span><span class="o">.</span><span class="n">unicode_to_latex</span><span class="p">(</span>
+            <span class="n">f</span><span class="s2">&quot;Source ``</span><span class="si">{self.id}</span><span class="s2">&#39;&#39;</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">begin{{itemize}}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Language: </span><span class="si">{self.language}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Aligned text ID: </span><span class="si">{self.alignment_id}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Title: </span><span class="si">{self.title}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Citation: </span><span class="si">{self.citation_part}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Editorial note: </span><span class="si">{self.editorial_note}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Annotator: </span><span class="si">{self.annotator}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Reviewer: </span><span class="si">{self.reviewer}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">item Original URL: </span><span class="se">\\</span><span class="s2">url{{</span><span class="si">{self.original_url}</span><span class="s2">}}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">end{{itemize}}&quot;</span><span class="p">)</span> \
+            <span class="k">if</span> <span class="s2">&quot;latex&quot;</span> <span class="ow">in</span> <span class="n">tabletype</span> <span class="k">else</span> \
+            <span class="n">f</span><span class="s2">&quot;Source ``</span><span class="si">{self.id}</span><span class="s2">&#39;&#39;</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;---------------------------------------</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Language: </span><span class="si">{self.language}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Aligned text ID: </span><span class="si">{self.alignment_id}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Title: </span><span class="si">{self.title}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Citation: </span><span class="si">{self.citation_part}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Editorial note: </span><span class="si">{self.editorial_note}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Annotator: </span><span class="si">{self.annotator}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Reviewer: </span><span class="si">{self.reviewer}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2"> Original URL: </span><span class="si">{self.original_url}</span><span class="se">\n</span><span class="s2">&quot;</span> \
+            <span class="n">f</span><span class="s2">&quot;#######################################&quot;</span>
+        <span class="n">sentences</span> <span class="o">=</span> <span class="p">[</span><span class="n">header</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">sentence</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">sentences</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sentence</span><span class="o">.</span><span class="n">to_table</span><span class="p">(</span><span class="n">tabletype</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\n\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sentences</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Source.compare"><a class="viewcode-back" href="../index.html#xmlc.Source.compare">[docs]</a>    <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">another</span><span class="p">:</span> <span class="s2">&quot;Source&quot;</span><span class="p">,</span>
+                <span class="n">sentences</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+                <span class="n">status</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AnnotationStatus</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">tabletype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;simple&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        With the given source, compares each sentence defined at `sentences`</span>
+<span class="sd">        and generates a table with the sentences comparison.</span>
+
+<span class="sd">        :param Source another: the other source to compare with.</span>
+<span class="sd">        :param sentences: the sentences to compare. Empty means all.</span>
+<span class="sd">        :type sentences: tuple[str, ...]</span>
+<span class="sd">        :param AnnotationStatus status: the sentence status to use when</span>
+<span class="sd">            comparing. None means unused.</span>
+<span class="sd">        :param str tabletype: the output format for the table.</span>
+
+<span class="sd">        :return: sources comparison as a table.</span>
+<span class="sd">        :rtype: str</span>
+
+<span class="sd">        :raises ValueError: if the sources are not aligned.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">!=</span> <span class="n">another</span><span class="o">.</span><span class="n">id</span> <span class="ow">and</span> <span class="n">another</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Sources are not aligned!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">alignment_id</span> <span class="o">==</span> <span class="n">another</span><span class="o">.</span><span class="n">id</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span>
+            <span class="n">other</span> <span class="o">=</span> <span class="n">another</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">another</span>
+            <span class="n">other</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="n">tables</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sentence1</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">aligned_sentence_id</span> <span class="o">=</span> <span class="n">sentence1</span><span class="o">.</span><span class="n">alignment_id</span>
+            <span class="n">sentence2</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="n">other</span><span class="o">.</span><span class="n">dirs</span><span class="p">[</span><span class="n">aligned_sentence_id</span><span class="p">]]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sentences</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">sentence1</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sentences</span><span class="p">:</span>
+                    <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">sentence1</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="n">status</span> <span class="ow">or</span> <span class="n">sentence2</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="n">status</span><span class="p">:</span>
+                    <span class="k">continue</span>
+            <span class="n">tables</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sentence1</span><span class="o">.</span><span class="n">side_by_side</span><span class="p">(</span><span class="n">sentence2</span><span class="p">,</span> <span class="n">tabletype</span><span class="p">))</span>
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="se">\n\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tables</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Source.find_words_by"><a class="viewcode-back" href="../index.html#xmlc.Source.find_words_by">[docs]</a>    <span class="k">def</span> <span class="nf">find_words_by</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>
+                      <span class="n">data</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">AnnotationElements</span><span class="p">,</span> <span class="n">Union</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> \
+            <span class="n">List</span><span class="p">[</span><span class="n">Token</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        With the given requirements, find all tokens that fulfills them.</span>
+
+<span class="sd">        :param data: a dictionary containing the annotation elements to filter</span>
+<span class="sd">            and the conditions of the filtering.</span>
+<span class="sd">        :type data: dict[AnnotationElements, set[str] or str]</span>
+<span class="sd">        :return: a list of tokens that fulfills the requirements.</span>
+<span class="sd">        :rtype: list[Token]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">field</span><span class="o">.</span><span class="n">find_by</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">results</span></div></div>
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../index.html#xmlc.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Main function that demonstrates how XMLCorpus works. Must receive a file</span>
+<span class="sd">    containing two souces with IDs &#39;text1&#39; and &#39;text2&#39;, respectively.</span>
+
+<span class="sd">    :param args: command line arguments provided when this script is called.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">XMLParser</span><span class="p">(</span><span class="n">remove_comments</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">tree</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">file</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="n">parser</span><span class="p">)</span>
+    <span class="n">annotation_element</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">annotation_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">annotation_tree</span> <span class="o">=</span> <span class="n">etree</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">annotation_file</span><span class="p">)</span>
+        <span class="n">annotation_element</span> <span class="o">=</span> <span class="n">annotation_tree</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;annotation&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">annotation_element</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">annotation_element</span> <span class="o">=</span> <span class="n">tree</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s1">&#39;annotation&#39;</span><span class="p">)</span>
+
+    <span class="n">annotation</span> <span class="o">=</span> <span class="n">Annotation</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">annotation_element</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">annotation</span><span class="p">)</span>
+
+    <span class="n">sources</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Source</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">&#39;source&#39;</span><span class="p">):</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">Source</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">Sentence</span><span class="p">,</span>
+                           <span class="n">annotation</span><span class="o">=</span><span class="n">annotation</span><span class="p">,</span>
+                           <span class="n">ignored_tags</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;title&#39;</span><span class="p">})</span>
+        <span class="n">sources</span><span class="p">[</span><span class="n">src</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">src</span>
+
+    <span class="n">text1</span> <span class="o">=</span> <span class="n">sources</span><span class="p">[</span><span class="s1">&#39;text1&#39;</span><span class="p">]</span>
+    <span class="n">text2</span> <span class="o">=</span> <span class="n">sources</span><span class="p">[</span><span class="s1">&#39;text2&#39;</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">text1</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">text2</span><span class="p">,</span> <span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;grid&quot;</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">text1</span><span class="o">.</span><span class="n">find_words_by</span><span class="p">({</span>
+        <span class="n">AnnotationElements</span><span class="o">.</span><span class="n">Morphology</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;number.s&quot;</span><span class="p">,</span> <span class="s2">&quot;gender.m&quot;</span><span class="p">},</span>
+        <span class="n">AnnotationElements</span><span class="o">.</span><span class="n">PartsOfSpeech</span><span class="p">:</span> <span class="s1">&#39;Ne&#39;</span>
+    <span class="p">}):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">token</span><span class="o">.</span><span class="n">to_table</span><span class="p">(</span><span class="n">tabletype</span><span class="o">=</span><span class="s2">&quot;grid&quot;</span><span class="p">))</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">&quot;XMLCorpus file parser&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;file&quot;</span><span class="p">,</span>
+                        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;FILENAME&quot;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;XML file to analyze&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s2">&quot;-af&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;--annotation-file&quot;</span><span class="p">,</span>
+                        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;FILENAME&quot;</span><span class="p">,</span>
+                        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Optional XML file containing annotation data&quot;</span><span class="p">,</span>
+                        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">main</span><span class="p">(</span><span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">())</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">XMLCorpus</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Javinator9889.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
