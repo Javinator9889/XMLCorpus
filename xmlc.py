@@ -563,9 +563,10 @@ class Token(XMLItem):
                             dirs[annotation.morphology[i].tag] = idx
                             idx += 1
                         except KeyError:
-                            if i > len(annotation.morphology.fields):
-                                warn(f"More morphologies {i} than previously"
-                                     f"declared (were "
+                            if i >= len(annotation.morphology.fields):
+                                warn(f"More morphologies {i + 1} than "
+                                     f"previously declared in annotations ("
+                                     f"were "
                                      f"{len(annotation.morphology.fields)})")
                             else:
                                 warn(f"Morphology with tag '{field}' not "
