@@ -366,7 +366,7 @@ class Token(XMLItem):
         return token_desc
 
     def to_table(self, tabletype="simple", add_headers=True) -> str:
-        headers = create_column_headers(f"Word", tabletype)
+        headers = create_column_headers(f"Word ({self.id})", tabletype)
         table_output = [[header] if add_headers else [] for header in headers]
         token_desc = self.describe(tabletype)
         for i, desc in zip(range(len(token_desc)), token_desc):
@@ -578,7 +578,31 @@ class Source(XMLGroup[Sentence]):
         return source
 
     def to_table(self, tabletype="simple") -> str:
-        sentences = []
+        header = encoder.unicode_to_latex(
+            f"Source ``{self.id}''\n"
+            f"\\begin{{itemize}}\n"
+            f"\\item Language: {self.language}\n"
+            f"\\item Aligned text ID: {self.alignment_id}\n"
+            f"\\item Title: {self.title}\n"
+            f"\\item Citation: {self.citation_part}\n"
+            f"\\item Editorial note: {self.editorial_note}\n"
+            f"\\item Annotator: {self.annotator}\n"
+            f"\\item Reviewer: {self.reviewer}\n"
+            f"\\item Original URL: \\url{{{self.original_url}}}\n"
+            f"\\end{{itemize}}") \
+            if "latex" in tabletype else \
+            f"Source ``{self.id}''\n" \
+            f"---------------------------------------\n" \
+            f"\t Language: {self.language}\n" \
+            f"\t Aligned text ID: {self.alignment_id}\n" \
+            f"\t Title: {self.title}\n" \
+            f"\t Citation: {self.citation_part}\n" \
+            f"\t Editorial note: {self.editorial_note}\n" \
+            f"\t Annotator: {self.annotator}\n" \
+            f"\t Reviewer: {self.reviewer}\n" \
+            f"\t Original URL: {self.original_url}\n" \
+            f"#######################################"
+        sentences = [header]
         for sentence in self.fields:
             sentences.append(sentence.to_table(tabletype))
         return '\n\n'.join(sentences)
