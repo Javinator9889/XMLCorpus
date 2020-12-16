@@ -631,6 +631,7 @@ class Token(XMLItem):
 
         align = ("center",) * len(table_output[0])
         table = tabulate(table_output, colalign=align, tablefmt=tabletype)
+        table = table.replace('{tabular}{¢', '{tabular}{c|')
         return encoder.unicode_to_latex(table) \
             if "latex" in tabletype \
             else table
@@ -701,9 +702,11 @@ class Sentence(XMLGroup[Token]):
                 table_output[i].append(data)
         align = ("center",) * len(table_output[0])
         table = tabulate(table_output, colalign=align, tablefmt=tabletype)
-        return encoder.unicode_to_latex(table) \
-            if "latex" in tabletype \
-            else table
+        if "latex" in tabletype:
+            table = table.replace("{tabular}{c", "{tabular}{c|")
+            return encoder.unicode_to_latex(table)
+        else:
+            return table
 
     def find_by(self, data: Dict[AnnotationElements, Union[Set[str], str]]) -> \
             List[Token]:
